@@ -38,6 +38,7 @@ field_list = {
     'use_estimated_gradient_stop'
     'grad_window_size'
     'grad_tol'
+    'estimated_lipschitz_constant'
     'Algorithm'
     'direction_set'
     'num_blocks'

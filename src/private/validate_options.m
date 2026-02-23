@@ -89,6 +89,13 @@ if isfield(options, 'grad_tol')
     end
 end
 
+% estimated_lipschitz_constant
+if isfield(options, 'estimated_lipschitz_constant')
+    if ~(isrealscalar(options.estimated_lipschitz_constant) && options.estimated_lipschitz_constant > 0)
+        error('options.estimated_lipschitz_constant must be a positive real scalar.');
+    end
+end
+
 % Algorithm
 Algorithm_list = ["cbds", "pbds", "pads", "rbds", "ds"];
 if isfield(options, 'Algorithm')

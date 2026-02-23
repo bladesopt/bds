@@ -18,6 +18,8 @@ switch constant_name
         constant_value = 1;
     case {"grad_tol"}
         constant_value = 1e-6;
+    case {"estimated_lipschitz_constant"}
+        constant_value = 1e3;
     case {"block_visiting_pattern"}
         constant_value = "sorted";
     case {"alpha_init"}

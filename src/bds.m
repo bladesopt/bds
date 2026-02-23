@@ -160,6 +160,9 @@ function [xopt, fopt, exitflag, output] = bds(fun, x0, options)
 %                               range, the algorithm terminates.
 %                               It should be a positive number. 
 %                               Default: 1e-6.
+%  estimated_lipschitz_constant An estimate of the Lipschitz constant of the objective function. 
+%                               It is used for computing the gradient error bound when 
+%                               use_estimated_gradient_stop is true. It should be a positive number.
 %
 %   The following options are related to output and debugging.
 %   output_xhist                Whether to output the history of points visited.
@@ -296,6 +299,8 @@ grad_tol = options.grad_tol;
 % valid gradient norms.
 norm_grad_window = nan(1, grad_window_size);
 record_gradient_norm = false;
+
+estimated_lipschitz_constant = options.estimated_lipschitz_constant;
 
 % Get the direction set.
 D = get_direction_set(n, options);
@@ -717,7 +722,8 @@ for iter = 1:maxit
                 grad_error = get_gradient_error_bound(grad_info.step_size_per_block, ...
                                                     batch_size, grouped_direction_indices, n, ...
                                                     positive_direction_set, ...
-                                                    direction_selection_probability_matrix);
+                                                    direction_selection_probability_matrix, ...
+                                                    estimated_lipschitz_constant);
 
                 % Set up the reference gradient norm for the stopping criterion.
                 %
