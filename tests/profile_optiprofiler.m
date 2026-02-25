@@ -345,8 +345,8 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @cbds_simplified_test;
             case 'cbds-orig-termination'
                 solvers{i} = @cbds_orig_termination_test;
-            case 'cbds-orig-alpha-init'
-                solvers{i} = @cbds_orig_alpha_init_test;
+            case 'cbds-orig-alpha-init-auto'
+                solvers{i} = @cbds_orig_alpha_init_auto_test;
             otherwise
                 error('Unknown solver');
         end
@@ -1486,30 +1486,13 @@ function x = cbds_orig_termination_test(fun, x0)
     
 end
 
-function x = cbds_orig_alpha_init_test(fun, x0)
+function x = cbds_orig_alpha_init_auto_test(fun, x0)
 
     option.Algorithm = 'cbds';
     option.expand = 2;
     option.shrink = 0.5;
 
-    % Parameters (Standard)
-    AlphaFloor    = 1e-3;
-    DeltaRelative = 0.05; 
-    DeltaZero     = 1e-2;
-
-    % Calculate Smart Alpha
-    n = numel(x0);
-    alpha_vec = zeros(n, 1);
-    for i = 1:n
-        if x0(i) ~= 0
-            val = DeltaRelative * abs(x0(i));
-            alpha_vec(i) = max(val, AlphaFloor);
-        else
-            alpha_vec(i) = max(DeltaZero, AlphaFloor);
-        end
-    end
-
-    option.alpha_init = alpha_vec;
+    option.alpha_init = 'auto';
 
     x = bds(fun, x0, option);
     

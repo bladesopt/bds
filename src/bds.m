@@ -28,10 +28,24 @@ function [xopt, fopt, exitflag, output] = bds(fun, x0, options)
 %   num_blocks                  Number of blocks. A positive integer. The number of blocks
 %                               should be less than or equal to the dimension of the problem.
 %                               Default: length(x0).
+%   direction_set               A matrix whose columns will be used to define the polling directions. 
+%                               If options does not contain direction_set, then the polling
+%                               directions will be {e_1, -e_1, ..., e_n, -e_n}.
+%                               Otherwise, it should be a nonsingular n-by-n matrix. Then the 
+%                               polling directions will be {d_1, -d_1, ..., d_n, -d_n}, where d_i is
+%                               the i-th column of direction_set. If direction_set is not singular, 
+%                               then we will revise the direction_set to make it linear independent.
+%                               See get_direction_set.m for details. 
+%                               Default: eye(n).
 %   alpha_init                  Initial step size. If alpha_init is a positive scalar, then the 
 %                               initial step size of each block is set to alpha_init. If alpha_init 
 %                               is a vector, then the initial step size of the i-th block is
-%                               set to alpha_init(i).
+%                               set to alpha_init(i). If alpha_init is "auto", then the initial 
+%                               step size is derived from x0 by using
+%                               max(abs(x0(i)), options.StepTolerance(i)) for each coordinate,
+%                               with 1 used when x0(i) = 0. This option assumes the default
+%                               direction set [e_1, -e_1, ..., e_n, -e_n], ordered by coordinates
+%                               1, 2, ..., n, with [e_i, -e_i] treated as one block.
 %                               Default: 1.
 %   forcing_function            The forcing function used for deciding whether the step achieves a 
 %                               sufficient decrease. forcing_function should be a function handle.
@@ -54,15 +68,6 @@ function [xopt, fopt, exitflag, output] = bds(fun, x0, options)
 %                               used in the current iteration (before any update), not the updated
 %                               step size for the next iteration.
 %                               Default: [0, eps, eps]. See also forcing_function.
-%   direction_set               A matrix whose columns will be used to define the polling directions. 
-%                               If options does not contain direction_set, then the polling
-%                               directions will be {e_1, -e_1, ..., e_n, -e_n}.
-%                               Otherwise, it should be a nonsingular n-by-n matrix. Then the 
-%                               polling directions will be {d_1, -d_1, ..., d_n, -d_n}, where d_i is
-%                               the i-th column of direction_set. If direction_set is not singular, 
-%                               then we will revise the direction_set to make it linear independent.
-%                               See get_direction_set.m for details. 
-%                               Default: eye(n).
 %
 %   The following options are advanced options for users with specific needs.
 %   Algorithm                   Algorithm to use. It can be 
@@ -266,7 +271,7 @@ end
 n = length(x0);
 
 % Set the default value of options.
-options = set_options(options, n);
+options = set_options(options, n, x0);
 
 MaxFunctionEvaluations = options.MaxFunctionEvaluations;
 % Set the maximum number of iterations.

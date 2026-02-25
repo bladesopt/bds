@@ -1,7 +1,7 @@
-function options = set_options(options, n)
+function options = set_options(options, n, x0)
 % SET_OPTIONS Set and validate options for the BDS algorithm.
 %
-%   OPTIONS = SET_OPTIONS(OPTIONS, N) processes and validates the input options
+%   OPTIONS = SET_OPTIONS(OPTIONS, N, X0) processes and validates the input options
 %   structure for the BDS algorithm. It performs the following tasks:
 %   1. Validate that all field names in OPTIONS are recognized.
 %   2. Validate that all field values are valid (via validate_options).
@@ -16,6 +16,7 @@ function options = set_options(options, n)
 %   - options: A structure containing user-specified options for the BDS algorithm.
 %              All field names must be valid and recognized.
 %   - n: The dimension of the optimization problem.
+%   - x0: The initial point for the optimization problem.
 %
 %   Outputs:
 %   - options: A fully validated and processed options structure with all required
@@ -140,8 +141,6 @@ if ~isfield(options, 'num_blocks')
     options.num_blocks = n;
 end
 
-% Note: StepTolerance logic requires options.num_blocks to be defined, so it is placed here
-% despite appearing earlier in the comment of bds.m.
 % Set the step size threshold for termination. The algorithm terminates when the step size for each 
 % block falls below their corresponding threshold.
 % If StepTolerance is not provided, it is set to 1e-6 for each block.
@@ -152,9 +151,8 @@ if isfield(options, "StepTolerance")
     elseif length(options.StepTolerance) == options.num_blocks
         options.StepTolerance = options.StepTolerance(:);
     else
-        warning('BDS:set_options:InvalidStepTolerance', ...
-            'options.StepTolerance is invalid. Default value (1e-6 for each block) will be used.');
-        options.StepTolerance = 1e-6 * ones(options.num_blocks, 1);
+        error('BDS:set_options:InvalidStepToleranceLength', ...
+            'Length of options.StepTolerance must match options.num_blocks.');
     end
 else
     options.StepTolerance = 1e-6 * ones(options.num_blocks, 1);
@@ -164,9 +162,8 @@ end
 if ~isfield(options, 'batch_size')
     options.batch_size = options.num_blocks;
 elseif options.batch_size > options.num_blocks
-    warning('BDS:set_options:InvalidBatchSize', ...
-        'batch_size cannot exceed num_blocks. Set batch_size to num_blocks.');
-    options.batch_size = options.num_blocks;
+    error('BDS:set_options:BatchSizeTooLarge', ...
+        'options.batch_size cannot exceed options.num_blocks.');
 end
 
 % If replacement_delay is r, the block selected in the current iteration will not
@@ -176,9 +173,8 @@ end
 % Note that replacement_delay cannot exceed floor(num_blocks/batch_size) - 1.
 if isfield(options, "replacement_delay")
     if options.replacement_delay > floor(options.num_blocks/options.batch_size) - 1
-        warning('BDS:set_options:ReplacementDelayTooLarge', ...
-            'replacement_delay is too large. Setting to the maximum allowable value.');
-        options.replacement_delay = floor(options.num_blocks/options.batch_size) - 1;
+        error('BDS:set_options:InvalidReplacementDelay', ...
+            'options.replacement_delay cannot exceed floor(options.num_blocks/options.batch_size) - 1.');
     end
 else
     options.replacement_delay = floor(options.num_blocks/options.batch_size) - 1;
@@ -193,22 +189,28 @@ end
 % If options do not contain the field of alpha_init, then the initial step size of each block is set
 % to 1. If alpha_init is a positive scalar, then the initial step size of each block is set to 
 % alpha_init. If alpha_init is a vector, then the initial step size of the i-th block is set to 
-% alpha_init(i). If alpha_init is "auto", then the initial step size is set according to the 
-% coordinates of x0 with respect to the directions in D(:, 1 : 2 : 2*n-1).
+% alpha_init(i). If alpha_init is "auto", then the initial step size is derived from x0 by using
+% max(abs(x0(i)), options.StepTolerance(i)) for each coordinate, with 1 used when x0(i) = 0.
+% This option assumes the default direction set [e_1, -e_1, ..., e_n, -e_n], ordered by
+% coordinates 1, 2, ..., n, with [e_i, -e_i] treated as one block.
 if isfield(options, "alpha_init")
     if isscalar(options.alpha_init)
         options.alpha_init = options.alpha_init * ones(options.num_blocks, 1);
     elseif length(options.alpha_init) == options.num_blocks
         options.alpha_init = options.alpha_init(:);
+    elseif strcmpi(options.alpha_init,"auto")
+        alpha_init = zeros(n, 1);
+        for i = 1:n
+            if x0(i) ~= 0
+                alpha_init(i) = max(abs(x0(i)), options.StepTolerance(i));
+            else
+                alpha_init(i) = 1;
+            end
+        end
+        options.alpha_init = alpha_init;
     else
-        warning('BDS:set_options:InvalidAlphaInitLength', ...
-            'options.alpha_init has incompatible length; default value (ones) will be used.');
-        options.alpha_init = ones(options.num_blocks, 1);
-    % elseif strcmpi(options.alpha_init,"auto")
-    %     % x0_coordinates is the coordinates of x0 with respect to the directions in
-    %     % D(:, 1 : 2 : 2*n-1), where D(:, 1 : 2 : 2*n-1) is a basis of R^n.
-    %     x0_coordinates = D(:, 1 : 2 : 2*n-1) \ x0;
-    %     alpha_all = 0.5 * max(1, abs(x0_coordinates));
+        error('BDS:set_options:InvalidAlphaInitLength', ...
+            'Length of options.alpha_init must match options.num_blocks if it is a vector.');
     end
 else
     options.alpha_init = ones(options.num_blocks, 1);
