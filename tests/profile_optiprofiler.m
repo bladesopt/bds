@@ -1029,25 +1029,16 @@ function x = cbds_construct_directions_from_x0_test(fun, x0)
 
     % Ensure x0 is a column vector
     x0 = x0(:);
-    n = length(x0);
 
-    if norm(x0) > 1e-10
-        % Calculate the normalized direction pointing to the origin
-        d_target = -x0 / norm(x0);
-        
-        % Start with the standard sparse identity matrix
-        D = eye(n);
-        
-        % Find the index of the maximum absolute component in x0.
-        % This guarantees the new matrix remains strongly linearly independent.
-        [~, max_idx] = max(abs(x0));
-        
-        % Substitute the selected column with our target direction
-        D(:, max_idx) = d_target;
-    else
-        % Fallback for origin or extremely small initial points
-        D = eye(n);
-    end
+    % Extract the sign of x0 to determine the direction towards the origin.
+    % If x0(i) is exactly 0, sign() returns 0. We default to 1 to maintain full rank.
+    s = sign(x0);
+    s(s == 0) = 1;
+    
+    % Construct the Directed Coordinate Basis:
+    % We flip the sign (-s) so that the basis vector points TOWARDS the origin.
+    % Using diag() ensures the matrix remains 100% sparse and orthogonal.
+    D = diag(-s);
 
     option.direction_set = D;
     option.expand = 2;
