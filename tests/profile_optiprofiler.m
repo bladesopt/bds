@@ -70,7 +70,7 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
         % Actually, the way of truncating the function value is to
         % Truncate to n significant figures and round off the last digit, which
         % can be regarded as some kind of noise. The minimum value should be
-        % 0 of course. When it comes to the case of maximum value, the actural 
+        % 0 of course. When it comes to the case of maximum value, the actual
         % value is 10^m + 5*10^{m-n} and the truncated value is 5*10^{m-n}.
         % The relative error is 5/(10^n + 5). Assume that the noise follows
         % the uniform distribution, then the noise level is 5/(10^n + 5) * 0.5.
@@ -117,19 +117,22 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             options.solver_names(strcmpi(options.solver_names, 'fd-bfgs')) = {'adaptive-fd-bfgs'};
         end
         bds_Algorithms = {'ds', 'ds-randomized-orthogonal', 'pbds', 'rbds', 'pads', 'scbds', 'cbds', 'cbds-randomized-orthogonal',...
-         'cbds-randomized-gaussian', 'cbds-permuted', 'cbds-rotated-initial-point'};
+         'cbds-randomized-gaussian', 'cbds-permuted'};
         if any(ismember(bds_Algorithms, options.solver_names))
-            options.solver_names(strcmpi(options.solver_names, 'ds')) = {'ds-noisy'};
+            % options.solver_names(strcmpi(options.solver_names, 'ds')) = {'ds-noisy'};
+            % Temporarily, we will use the label 'ds'.
+            options.solver_names(strcmpi(options.solver_names, 'ds')) = {'ds'};
             options.solver_names(strcmpi(options.solver_names, 'ds-randomized-orthogonal')) = {'ds-randomized-orthogonal-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'pbds')) = {'pbds-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'rbds')) = {'rbds-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'pads')) = {'pads-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'scbds')) = {'scbds-noisy'};
-            options.solver_names(strcmpi(options.solver_names, 'cbds')) = {'cbds-noisy'};
+            % options.solver_names(strcmpi(options.solver_names, 'cbds')) = {'cbds-noisy'};
+            % Temporarily, we will use the label 'cbds'.
+            options.solver_names(strcmpi(options.solver_names, 'cbds')) = {'cbds'};
             options.solver_names(strcmpi(options.solver_names, 'cbds-randomized-orthogonal')) = {'cbds-randomized-orthogonal-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'cbds-randomized-gaussian')) = {'cbds-randomized-gaussian-noisy'};
             options.solver_names(strcmpi(options.solver_names, 'cbds-permuted')) = {'cbds-permuted-noisy'};
-            options.solver_names(strcmpi(options.solver_names, 'cbds-rotated-initial-point')) = {'cbds-rotated-initial-point-noisy'};
         end
     end
 
@@ -145,7 +148,6 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
     end
     time_str = char(datetime('now', 'Format', 'yy_MM_dd_HH_mm'));
     options.silent = false;
-    options.keep_pool = true;
     options.ptype = 'u';
     if isfield(options, 'dim')
         if strcmpi(options.dim, 'small')
@@ -153,7 +155,10 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             options.maxdim = 5;
         elseif strcmpi(options.dim, 'big')
             options.mindim = 6;
-            options.maxdim = 50;
+            options.maxdim = 20;
+        elseif strcmpi(options.dim, 'large')
+            options.mindim = 21;
+            options.maxdim = 200;
         end
         options = rmfield(options, 'dim');
     end
@@ -169,6 +174,8 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
     solvers = cell(1, length(options.solver_names));
     for i = 1:length(options.solver_names)
         switch options.solver_names{i}
+            case 'our-method'
+                solvers{i} = @cbds_orig_test;
             case 'adaptive-fd-bfgs'
                 solvers{i} = @(fun, x0) fminunc_adaptive(fun, x0, options.noise_level);
             case 'fd-bfgs'
@@ -179,7 +186,7 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @praxis_test;
             case 'nelder-mead'
                 solvers{i} = @fminsearch_test;
-            case 'direct-search'
+            case 'ds'
                 solvers{i} = @ds_test;
             case 'direct-search-orig'
                 solvers{i} = @ds_orig_test;
@@ -207,6 +214,8 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @pbds_permuted_half_n_test;
             case 'pbds-permuted-n'
                 solvers{i} = @pbds_permuted_n_test;
+            case 'rbds-orig'
+                solvers{i} = @rbds_orig_test;
             case 'rbds'
                 solvers{i} = @rbds_test;
             case 'rbds-noisy'
@@ -229,21 +238,34 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             % rnm1d means the replacement delay is equal to the dimension of the problem minus one.
             case 'rnm1d'
                 solvers{i} = @rbds_n_minus_1_delay_test;
-            % rnb means the number of selected blocks is equal to the dimension of the problem.
+            % rnb means the batch size is equal to the dimension of the problem.
             case 'rnb'
-                solvers{i} = @rbds_num_selected_blocks_n_test;
-            % rhnb means the number of selected blocks is equal to the half of the dimension of the problem.
+                solvers{i} = @rbds_batch_size_n_test;
+            % rhnb means the batch size is equal to the half of the dimension of the problem.
             case 'rhnb'
-                solvers{i} = @rbds_num_selected_blocks_half_n_test;
-            % rqnb means the number of selected blocks is equal to the quarter of the dimension of the problem.
+                solvers{i} = @rbds_batch_size_half_n_test;
+            % rqnb means the batch size is equal to the quarter of the dimension of the problem.
             case 'rqnb'
-                solvers{i} = @rbds_num_selected_blocks_quarter_n_test;
-            % renb means the number of selected blocks is equal to the eighth of the dimension of the problem.
+                solvers{i} = @rbds_batch_size_quarter_n_test;
+            % renb means the batch size is equal to the eighth of the dimension of the problem.
             case 'renb'
-                solvers{i} = @rbds_num_selected_blocks_eighth_n_test;
-            % r1b means the number of selected blocks is equal to 1.
+                solvers{i} = @rbds_batch_size_eighth_n_test;
+            % r1b means the batch size is equal to 1.
             case 'r1b'
-                solvers{i} = @rbds_num_selected_blocks_one_test;
+                solvers{i} = @rbds_batch_size_one_test;
+            % r1bs means the batch size is equal to 1 and the seed is fixed.
+            case 'r1bs'
+                solvers{i} = @rbds_batch_size_one_seed_test;   
+            % r1bse means the batch size is equal to 1 and the seed is fixed and the expand equals
+            % to 2 and the shrink satisfies the boundary condition of 1/n > p_0.  
+            case 'r1bse'
+                solvers{i} = @rbds_batch_size_one_seed_expand_cov_test;
+            % r1bss means the batch size is equal to 1 and the seed is fixed and the shrink equals
+            % to 0.5 and the expand satisfies the boundary condition of 1/n > p_0.  
+            case 'r1bss'
+                solvers{i} = @rbds_batch_size_one_seed_shrink_cov_test; 
+            case 'pads-orig'
+                solvers{i} = @pads_orig_test;
             case 'pads'
                 solvers{i} = @pads_test;
             case 'pads-noisy'
@@ -273,11 +295,11 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             case 'cbds-noisy'
                 solvers{i} = @(fun, x0) cbds_test_noisy(fun, x0, true);
             case 'cbds-half-block'
-                solvers{i} = @cbds_half_block_test;
+                solvers{i} = @cbds_num_blocks_half_n_test;
             case 'cbds-quarter-block'
-                solvers{i} = @cbds_quarter_block_test;
+                solvers{i} = @cbds_num_blocks_quarter_n_test;
             case 'cbds-eighth-block'
-                solvers{i} = @cbds_eighth_block_test;
+                solvers{i} = @cbds_num_blocks_eighth_n_test;
             case 'cbds-randomized-orthogonal'
                 solvers{i} = @cbds_randomized_orthogonal_test;
             case 'cbds-randomized-orthogonal-noisy'
@@ -290,10 +312,8 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @cbds_permuted_test;
             case 'cbds-permuted-noisy'
                 solvers{i} = @(fun, x0) cbds_permuted_test_noisy(fun, x0, true);
-            case 'cbds-rotated-initial-point'
-                solvers{i} = @cbds_rotated_initial_point_test;
-            case 'cbds-rotated-initial-point-noisy'
-                solvers{i} = @(fun, x0) cbds_rotated_initial_point_test_noisy(fun, x0, true);
+            case 'cbds-orig-direction-set-from-x0'
+                solvers{i} = @cbds_construct_directions_from_x0_test;
             case 'pds'
                 solvers{i} = @pds_test;
             case 'bfo'
@@ -308,16 +328,6 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @nomad_test;
             case 'nomad-6'
                 solvers{i} = @nomad_6_test;
-            case 'quadratic'
-                solvers{i} = @cbds_quadratic_test;
-            case 'cubic'
-                solvers{i} = @cbds_cubic_test;
-            case 'quartic'
-                solvers{i} = @cbds_quartic_test;
-            case 'quintic'
-                solvers{i} = @cbds_quintic_test;
-            case 'sextic'
-                solvers{i} = @cbds_sextic_test;
             case 'cbds-reduction-factor-3'
                 solvers{i} = @cbds_reduction_factor_3_test;
             case 'cbds-reduction-factor-4'
@@ -341,6 +351,11 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
         else
             options.benchmark_id = [options.benchmark_id, '_', strrep(options.solver_names{i}, '-', '_')];
         end
+    end
+    if isfield(options, 'problem_names')
+        options.benchmark_id = [options.benchmark_id, '_', options.problem_names{1}, '_', num2str(options.n_runs)];
+    else
+        options.benchmark_id = [options.benchmark_id, '_', num2str(options.mindim), '_', num2str(options.maxdim), '_', num2str(options.n_runs)];
     end
     options.benchmark_id = [options.benchmark_id, '_', num2str(options.mindim), '_', num2str(options.maxdim), '_', num2str(options.n_runs)];
     switch options.feature_name
@@ -392,8 +407,54 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
     if options.run_plain
         options.benchmark_id = [options.benchmark_id, '_plain'];
     end
+    if isfield(options, 'plibs')
+        options.benchmark_id = [options.benchmark_id, '_', options.plibs];
+    else
+        % If the plibs is not provided, we will use the default value, which is 's2mpj'.
+        options.benchmark_id = [options.benchmark_id, '_s2mpj'];
+    end
     options.benchmark_id = [options.benchmark_id, '_', time_str];
-    options.excludelist = {'DIAMON2DLS',...
+    
+    if ~isfield(options, 'problem_names')
+        if isfield(options, 'plibs') && strcmpi(options.plibs, 'matcutest')
+            options.excludelist = {'ARGTRIGLS',...
+            'BROWNAL',...
+            'COATING',...
+            'DIAMON2DLS',...
+            'DIAMON3DLS',...
+            'DMN15102LS', ...
+            'DMN15103LS',...
+            'DMN15332LS',...
+            'DMN15333LS',...
+            'DMN37142LS',...
+            'DMN37143LS',...
+            'ERRINRSM',...
+            'HYDC20LS',...
+            'LRA9A',...
+            'LRCOVTYPE',...
+            'LUKSAN12LS',...
+            'LUKSAN14LS',...
+            'LUKSAN17LS',...
+            'LUKSAN21LS',...
+            'LUKSAN22LS',...
+            'MANCINO',...
+            'PENALTY2',...
+            'PENALTY3',...
+            'VARDIM',...
+            'GAUSS1LS',...
+            'GAUSS2LS',...
+            'GAUSS3LS',...
+            'CERI651ALS',...
+            'CERI651BLS',...
+            'CERI651CLS',...
+            'CERI651DLS',...
+            'CERI651ELS',...
+            'MISRA1ALS',...
+            'OSBORNEA',...
+            'ECKERLE4LS',...
+            'NELSONLS'};
+        else
+            options.excludelist = {'DIAMON2DLS',...
             'DIAMON2D',...
             'DIAMON3DLS',...
             'DIAMON3D',...
@@ -430,8 +491,14 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             'VESUVIALS',...
             'VESUVIOLS',...
             'VESUVIOULS',...
-            'YATP1CLS'};
-
+            'YATP1CLS',...
+            'MISRA1ALS',...
+            'OSBORNEA',...
+            'ECKERLE4LS',...
+            'NELSONLS'};
+        end
+    end
+    
     if strcmp(options.feature_name, 'custom')
 
         if ~isfield(options, 'permuted')
@@ -695,7 +762,7 @@ function x = pbds_orig_test(fun, x0)
     option.Algorithm = 'pbds';
     option.expand = 2;
     option.shrink = 0.5;
-    option.permuting_period = 0;
+    option.Algorithm = 'pbds';
     x = bds(fun, x0, option);
     
 end
@@ -837,32 +904,29 @@ function x = cbds_test_noisy(fun, x0, is_noisy)
     
 end
 
-function x = cbds_half_block_test(fun, x0)
+function x = cbds_num_blocks_half_n_test(fun, x0)
 
-    option.batch_size = ceil(numel(x0)/2);
+    option.num_blocks = ceil(numel(x0)/2);
     option.expand = 2;
     option.shrink = 0.5;
-    option.use_estimated_gradient_stop = false;
     x = bds(fun, x0, option);
     
 end
 
-function x = cbds_quarter_block_test(fun, x0)
+function x = cbds_num_blocks_quarter_n_test(fun, x0)
 
-    option.batch_size = ceil(numel(x0)/4);
+    option.num_blocks = ceil(numel(x0)/4);
     option.expand = 2;
     option.shrink = 0.5;
-    option.use_estimated_gradient_stop = false;
     x = bds(fun, x0, option);
     
 end
 
-function x = cbds_eighth_block_test(fun, x0)
+function x = cbds_num_blocks_eighth_n_test(fun, x0)
 
-    option.batch_size = ceil(numel(x0)/8);
+    option.num_blocks = ceil(numel(x0)/8);
     option.expand = 2;
     option.shrink = 0.5;
-    option.use_estimated_gradient_stop = false;
     x = bds(fun, x0, option);
     
 end
@@ -924,92 +988,85 @@ function x = cbds_permuted_test_noisy(fun, x0, is_noisy)
     
 end
 
-function x = cbds_rotated_initial_point_test(fun, x0) 
+% function x = cbds_construct_directions_from_x0_test(fun, x0) 
+
+%     option.Algorithm = 'cbds';
+
+%     % Ensure x0 is a column vector
+%     x0 = x0(:);
+%     n = length(x0);
+
+%     % Normalize the input vector
+%     x0_hat = x0 / norm(x0);
+
+%     % Construct the first standard basis vector
+%     e1 = zeros(n, 1);
+%     e1(1) = 1;
+
+%     % Check if x0 is already aligned with e1
+%     if norm(x0_hat - e1) < 1e-10
+%         R = eye(n); % If x0 is already aligned with e1, return identity matrix
+%     else
+%         % Compute the Householder vector
+%         u = x0_hat - e1;
+
+%         % Avoid numerical instability when u is close to zero
+%         if norm(u) < 1e-10
+%             % Use a fallback: set u to a simple direction
+%             u = zeros(n, 1);
+%             u(2) = 1; % Choose a valid direction orthogonal to e1
+%         else
+%             u = u / norm(u); % Normalize u
+%         end
+
+%         % Compute the Householder reflection matrix implicitly
+%         % H = I - 2 * (u * u'), but we avoid forming H explicitly
+%         % Instead, we compute R directly
+%         R = eye(n) - 2 * (u * u'); % Compute the full rotation matrix
+
+%         % Ensure that the first column of R is aligned with x0.
+%     end
+
+%     option.direction_set = R;
+%     option.expand = 2;
+%     option.shrink = 0.5;
+
+%     x = bds(fun, x0, option);
+    
+% end
+
+function x = cbds_construct_directions_from_x0_test(fun, x0) 
 
     option.Algorithm = 'cbds';
 
     % Ensure x0 is a column vector
     x0 = x0(:);
-    n = length(x0);
 
-    % Normalize the input vector
-    x0_hat = x0 / norm(x0);
+    % Extract the sign of x0 to determine the direction towards the origin.
+    % If x0(i) is exactly 0, sign() returns 0. We default to 1 to maintain full rank.
+    s = sign(x0);
+    s(s == 0) = 1;
+    
+    % Construct the Directed Coordinate Basis:
+    % We flip the sign (-s) so that the basis vector points TOWARDS the origin.
+    % Using diag() ensures the matrix remains 100% sparse and orthogonal.
+    D = diag(-s);
 
-    % Construct the first standard basis vector
-    e1 = zeros(n, 1);
-    e1(1) = 1;
+    option.direction_set = D;
+    option.expand = 2;
+    option.shrink = 0.5;
 
-    % Check if x0 is already aligned with e1
-    if norm(x0_hat - e1) < 1e-10
-        R = eye(n); % If x0 is already aligned with e1, return identity matrix
-    else
-        % Compute the Householder vector
-        u = x0_hat - e1;
-
-        % Avoid numerical instability when u is close to zero
-        if norm(u) < 1e-10
-            % Use a fallback: set u to a simple direction
-            u = zeros(n, 1);
-            u(2) = 1; % Choose a valid direction orthogonal to e1
-        else
-            u = u / norm(u); % Normalize u
-        end
-
-        % Compute the Householder reflection matrix implicitly
-        % H = I - 2 * (u * u'), but we avoid forming H explicitly
-        % Instead, we compute R directly
-        R = eye(n) - 2 * (u * u'); % Compute the full rotation matrix
-
-        % Ensure that the first column of R is aligned with x0.
-    end
-
-    option.direction_set = R;
-
-    x = bds_development(fun, x0, option);
+    x = bds(fun, x0, option);
     
 end
 
-function x = cbds_rotated_initial_point_test_noisy(fun, x0, is_noisy)
+function x = rbds_orig_test(fun, x0)
 
-    option.Algorithm = 'cbds';
-
-    % Ensure x0 is a column vector
-    x0 = x0(:);
-    n = length(x0);
-
-    % Normalize the input vector
-    x0_hat = x0 / norm(x0);
-
-    % Construct the first standard basis vector
-    e1 = zeros(n, 1);
-    e1(1) = 1;
-
-    % Check if x0 is already aligned with e1
-    if norm(x0_hat - e1) < 1e-10
-        R = eye(n); % If x0 is already aligned with e1, return identity matrix
-    else
-        % Compute the Householder vector
-        u = x0_hat - e1;
-
-        % Avoid numerical instability when u is close to zero
-        if norm(u) < 1e-10
-            % Use a fallback: set u to a simple direction
-            u = zeros(n, 1);
-            u(2) = 1; % Choose a valid direction orthogonal to e1
-        else
-            u = u / norm(u); % Normalize u
-        end
-
-        % Compute the Householder reflection matrix implicitly
-        % H = I - 2 * (u * u'), but we avoid forming H explicitly
-        % Instead, we compute R directly
-        R = eye(n) - 2 * (u * u'); % Compute the full rotation matrix
-    end
-
-    option.direction_set = R;
-    option.is_noisy = is_noisy;
-    x = bds_development(fun, x0, option);
-
+    option.Algorithm = 'rbds';
+    option.expand = 2;
+    option.shrink = 0.5;
+    x = bds(fun, x0, option);
+    
 end
 
 function x = rbds_test(fun, x0)
@@ -1029,7 +1086,6 @@ end
 
 function x = rbds_zero_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1040,7 +1096,6 @@ end
 
 function x = rbds_one_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1051,7 +1106,6 @@ end
 
 function x = rbds_eighth_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1062,7 +1116,6 @@ end
 
 function x = rbds_quarter_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1073,7 +1126,6 @@ end
 
 function x = rbds_half_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1084,7 +1136,6 @@ end
 
 function x = rbds_n_minus_1_delay_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.batch_size = 1;
     option.expand = 2;
     option.shrink = 0.5;
@@ -1093,9 +1144,8 @@ function x = rbds_n_minus_1_delay_test(fun, x0)
     
 end
 
-function x = rbds_num_selected_blocks_n_test(fun, x0)
+function x = rbds_batch_size_n_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.expand = 2;
     option.shrink = 0.5;
     option.batch_size = numel(x0);
@@ -1104,9 +1154,8 @@ function x = rbds_num_selected_blocks_n_test(fun, x0)
     
 end
 
-function x = rbds_num_selected_blocks_half_n_test(fun, x0)
+function x = rbds_batch_size_half_n_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.expand = 2;
     option.shrink = 0.5;
     option.batch_size = ceil(numel(x0)/2);
@@ -1115,9 +1164,8 @@ function x = rbds_num_selected_blocks_half_n_test(fun, x0)
 
 end
 
-function x = rbds_num_selected_blocks_quarter_n_test(fun, x0)
+function x = rbds_batch_size_quarter_n_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.expand = 2;
     option.shrink = 0.5;
     option.batch_size = ceil(numel(x0)/4);
@@ -1126,9 +1174,8 @@ function x = rbds_num_selected_blocks_quarter_n_test(fun, x0)
 
 end
 
-function x = rbds_num_selected_blocks_eighth_n_test(fun, x0)
+function x = rbds_batch_size_eighth_n_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.expand = 2;
     option.shrink = 0.5;
     option.batch_size = ceil(numel(x0)/8);
@@ -1137,15 +1184,65 @@ function x = rbds_num_selected_blocks_eighth_n_test(fun, x0)
 
 end
 
-function x = rbds_num_selected_blocks_one_test(fun, x0)
+function x = rbds_batch_size_one_test(fun, x0)
 
-    option.Algorithm = 'rbds';
     option.expand = 2;
     option.shrink = 0.5;
     option.batch_size = 1;
     option.replacement_delay = 0;
     x = bds(fun, x0, option);
 
+end
+
+function x = rbds_batch_size_one_seed_test(fun, x0)
+
+    option.expand = 2;
+    option.shrink = 0.5;
+    option.batch_size = 1;
+    option.replacement_delay = 0;
+    option.seed = round(1e4 * option.batch_size) + round(1e6 * option.replacement_delay) + round(sum(x0));
+    x = bds(fun, x0, option);
+
+end
+
+function x = rbds_batch_size_one_seed_expand_cov_test(fun, x0)
+
+    n = numel(x0);
+    option.expand = 2;
+    option.shrink = 2^(-1/(n+1));
+    option.batch_size = 1;
+    option.replacement_delay = 0;
+    option.seed = round(1e4 * option.batch_size) + round(1e6 * option.replacement_delay) + round(sum(x0));
+    x = bds(fun, x0, option);
+
+end
+
+function x = rbds_batch_size_one_seed_shrink_cov_test(fun, x0)
+
+    n = numel(x0);
+    option.shrink = 0.5;
+    option.expand = 0.5^(-(n+1));
+    option.batch_size = 1;
+    option.replacement_delay = 0;
+    option.seed = round(1e4 * option.batch_size) + round(1e6 * option.replacement_delay) + round(sum(x0));
+    x = bds(fun, x0, option);
+
+end
+
+function x = pads_orig_test(fun, x0)
+
+    option.Algorithm = 'pads';
+    option.expand = 2;
+    option.shrink = 0.5;
+    x = bds(fun, x0, option);
+    
+end
+
+function x = pads_test(fun, x0)
+
+    option.Algorithm = 'pads';
+    x = bds(fun, x0, option);
+    
 end
 
 function x = pads_test_noisy(fun, x0, is_noisy)
@@ -1173,7 +1270,9 @@ end
 
 function x = pds_test(fun, x0)
 
-    x = pds(fun, x0);
+    option.expand = 2;
+    option.shrink = 0.5;
+    x = pds(fun, x0, option);
     
 end
 
@@ -1258,55 +1357,6 @@ function x = nomad_6_test(fun, x0)
     fun = @(x) fun(x(:));
 
     [x, ~, ~, ~, ~] = nomadOpt(fun,x0,lb,ub,params);
-    
-end
-
-function x = cbds_quadratic_test(fun, x0)
-
-    option.forcing_function = @(alpha) alpha^2;
-    option.expand = 2;
-    option.shrink = 0.5;
-    x = bds(fun, x0, option);
-    
-end
-
-function x = cbds_cubic_test(fun, x0)
-
-    option.forcing_function = @(alpha) alpha^3;
-    option.expand = 2;
-    option.shrink = 0.5;
-    option.Algorithm = 'cbds';
-    x = bds(fun, x0, option);
-    
-end
-
-function x = cbds_quartic_test(fun, x0)
-
-    option.forcing_function = @(alpha) alpha^4;
-    option.expand = 2;
-    option.shrink = 0.5;
-    option.Algorithm = 'cbds';
-    x = bds(fun, x0, option);
-    
-end
-
-function x = cbds_quintic_test(fun, x0)
-
-    option.forcing_function = @(alpha) alpha^5;
-    option.expand = 2;
-    option.shrink = 0.5;
-    option.Algorithm = 'cbds';
-    x = bds(fun, x0, option);
-    
-end
-
-function x = cbds_sextic_test(fun, x0)
-
-    option.forcing_function = @(alpha) alpha^6;
-    option.expand = 2;
-    option.shrink = 0.5;
-    option.Algorithm = 'cbds';
-    x = bds(fun, x0, option);
     
 end
 
