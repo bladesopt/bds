@@ -1,4 +1,4 @@
-function [solver_scores, profile_scores] = profile_optiprofiler(options)
+function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
     clc
 
     path_tests = fileparts(mfilename('fullpath'));
@@ -472,36 +472,78 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @cbds_orig_termination_test;
             case 'cbds-orig-smart-alpha-init'
                 solvers{i} = @cbds_orig_smart_alpha_init_test;
+            case {'auto-accelerated-all-on-500n-no-optional-stop', ...
+                    'auto_accelerated_all_on_500n_no_optional_stop'}
+                solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
+                    fun, x0, false, false, 20, 1e-6, 1, 1e-6);
+            case {'auto-accelerated-all-on-500n-default-combined-stop', ...
+                    'auto_accelerated_all_on_500n_default_combined_stop'}
+                solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
+                    fun, x0, true, true, 20, 1e-6, 1, 1e-6);
             otherwise
-                [is_auto_candidate, c_x, c_tau, use_acceleration] = ...
-                    parse_auto_alpha_init_solver_name(options.solver_names{i});
-                if ~is_auto_candidate
-                    error('Unknown solver');
+                [is_stopping_candidate, func_window_size, func_tol, ...
+                    grad_window_size, grad_tol, use_function_stop, ...
+                    use_gradient_stop, lipschitz_constant, ...
+                    use_gradient_reference_reliability, ...
+                    grad_reference_consistency_tol, ...
+                    grad_reference_scale_factor] = ...
+                    parse_accelerated_auto_stopping_solver_name( ...
+                    options.solver_names{i});
+                if is_stopping_candidate
+                    solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
+                        fun, x0, use_function_stop, use_gradient_stop, ...
+                        func_window_size, func_tol, grad_window_size, grad_tol, ...
+                        lipschitz_constant, use_gradient_reference_reliability, ...
+                        grad_reference_consistency_tol, ...
+                        grad_reference_scale_factor);
+                else
+                    [is_auto_candidate, c_x, c_tau, use_acceleration, ...
+                        use_unit_steps, max_eval_factor] = ...
+                        parse_auto_alpha_init_solver_name(options.solver_names{i});
+                    if ~is_auto_candidate
+                        error('Unknown solver');
+                    end
+                    has_auto_alpha_candidate = true;
+                    solvers{i} = @(fun, x0) auto_alpha_init_profile_test( ...
+                        fun, x0, c_x, c_tau, use_acceleration, ...
+                        use_unit_steps, max_eval_factor);
                 end
-                has_auto_alpha_candidate = true;
-                solvers{i} = @(fun, x0) auto_alpha_init_profile_test( ...
-                    fun, x0, c_x, c_tau, use_acceleration);
         end
     end
     if has_auto_alpha_candidate
-        if isfield(options, 'max_eval_factor') && options.max_eval_factor ~= 500
+        auto_budgets = cellfun(@auto_alpha_init_budget_from_name, ...
+            options.solver_names(cellfun(@is_auto_alpha_init_solver_name, ...
+            options.solver_names)));
+        if numel(unique(auto_budgets)) ~= 1
+            error('profile_optiprofiler:MixedAutoAlphaBudgets', ...
+                'Automatic initial-step candidates in one benchmark must use one budget.');
+        end
+        required_max_eval_factor = auto_budgets(1);
+        if isfield(options, 'max_eval_factor') && ...
+                options.max_eval_factor ~= required_max_eval_factor
             error('profile_optiprofiler:AutoAlphaBudgetMismatch', ...
-                'Automatic initial-step candidates require max_eval_factor = 500.');
+                'The profile max_eval_factor must match the candidate labels.');
         end
-        options.max_eval_factor = 500;
+        options.max_eval_factor = required_max_eval_factor;
     end
-    options.benchmark_id = [];
-    for i = 1:length(solvers)
-        if i == 1
-            options.benchmark_id = strrep(options.solver_names{i}, '-', '_');
+    if ~isfield(options, 'benchmark_id') || isempty(options.benchmark_id)
+        options.benchmark_id = [];
+        for i = 1:length(solvers)
+            if i == 1
+                options.benchmark_id = strrep(options.solver_names{i}, '-', '_');
+            else
+                options.benchmark_id = [options.benchmark_id, '_', ...
+                    strrep(options.solver_names{i}, '-', '_')];
+            end
+        end
+        if isfield(options, 'problem_names')
+            options.benchmark_id = [options.benchmark_id, '_', ...
+                options.problem_names{1}, '_', num2str(options.n_runs)];
         else
-            options.benchmark_id = [options.benchmark_id, '_', strrep(options.solver_names{i}, '-', '_')];
+            options.benchmark_id = [options.benchmark_id, '_', ...
+                num2str(options.mindim), '_', num2str(options.maxdim), '_', ...
+                num2str(options.n_runs)];
         end
-    end
-    if isfield(options, 'problem_names')
-        options.benchmark_id = [options.benchmark_id, '_', options.problem_names{1}, '_', num2str(options.n_runs)];
-    else
-        options.benchmark_id = [options.benchmark_id, '_', num2str(options.mindim), '_', num2str(options.maxdim), '_', num2str(options.n_runs)];
     end
     switch options.feature_name
         case 'noisy'
@@ -678,7 +720,7 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             options = rmfield(options, 'noise_level');
 
     end
-    [solver_scores, profile_scores] = benchmark(solvers, options);
+    [solver_scores, profile_scores, curves] = benchmark(solvers, options);
     postprocess_summary_feature_titles(options, feature_display_name);
 
 end
@@ -1820,10 +1862,11 @@ function x = accelerated_bds_options_budget_limited_test(fun, x0)
 
 end
 
-function x = auto_alpha_init_profile_test(fun, x0, c_x, c_tau, use_acceleration)
+function x = auto_alpha_init_profile_test( ...
+        fun, x0, c_x, c_tau, use_acceleration, use_unit_steps, max_eval_factor)
 
     options.Algorithm = 'cbds';
-    options.MaxFunctionEvaluations = 500*length(x0);
+    options.MaxFunctionEvaluations = max_eval_factor*length(x0);
     options.StepTolerance = 1e-6;
     options.ftarget = -Inf;
     options.expand = 1.8;
@@ -1836,8 +1879,12 @@ function x = auto_alpha_init_profile_test(fun, x0, c_x, c_tau, use_acceleration)
     options.seed = 0;
     options.use_function_value_stop = false;
     options.use_estimated_gradient_stop = false;
-    alpha_init = auto_alpha_init_candidate( ...
-        x0, options.StepTolerance, c_x, c_tau);
+    if use_unit_steps
+        alpha_init = ones(length(x0), 1);
+    else
+        alpha_init = auto_alpha_init_candidate( ...
+            x0, options.StepTolerance, c_x, c_tau);
+    end
 
     if use_acceleration
         options.use_productive_direction_memory = true;
@@ -1852,17 +1899,145 @@ function x = auto_alpha_init_profile_test(fun, x0, c_x, c_tau, use_acceleration)
 
 end
 
-function [matched, c_x, c_tau, use_acceleration] = ...
+function x = accelerated_auto_stopping_profile_test(fun, x0, ...
+    use_function_stop, use_gradient_stop, func_window_size, func_tol, ...
+    grad_window_size, grad_tol, lipschitz_constant, ...
+    use_gradient_reference_reliability, grad_reference_consistency_tol, ...
+    grad_reference_scale_factor)
+
+    if nargin < 9
+        lipschitz_constant = 1e3;
+    end
+    if nargin < 10
+        use_gradient_reference_reliability = false;
+    end
+    if nargin < 11
+        grad_reference_consistency_tol = 0.1;
+    end
+    if nargin < 12
+        grad_reference_scale_factor = 1e-3;
+    end
+
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.expand = 1.8;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.seed = 0;
+    options.use_productive_direction_memory = true;
+    options.use_sweep_pattern_direction = true;
+    options.use_momentum_extrapolation = true;
+    options.alpha_init = auto_alpha_init_candidate( ...
+        x0, options.StepTolerance, 1, 1);
+    options.use_function_value_stop = use_function_stop;
+    options.func_window_size = func_window_size;
+    options.func_tol = func_tol;
+    options.use_estimated_gradient_stop = use_gradient_stop;
+    options.grad_window_size = grad_window_size;
+    options.grad_tol = grad_tol;
+    options.lipschitz_constant = lipschitz_constant;
+    options.use_gradient_reference_reliability = ...
+        use_gradient_reference_reliability;
+    options.grad_reference_consistency_tol = grad_reference_consistency_tol;
+    options.grad_reference_relative_tol = ...
+        grad_reference_scale_factor * grad_tol;
+    x = accelerated_bds_options(fun, x0, options);
+
+end
+
+function [matched, func_window_size, func_tol, grad_window_size, grad_tol, ...
+        use_function_stop, use_gradient_stop, lipschitz_constant, ...
+        use_gradient_reference_reliability, ...
+        grad_reference_consistency_tol, grad_reference_scale_factor] = ...
+    parse_accelerated_auto_stopping_solver_name(solver_name)
+
+    expression = ['^auto-accelerated-all-on-500n-', ...
+        '(stop|function-stop|gradient-stop)-', ...
+        'fw([0-9]+)-ft1em([0-9]+)-gw([0-9]+)-gt1em([0-9]+)$'];
+    solver_name_full = char(solver_name);
+    solver_name_without_scale = regexprep(solver_name_full, ...
+        '-grs[0-9]+(?:p[0-9]+)?$', '');
+    solver_name_base = regexprep(solver_name_without_scale, ...
+        '-grc[0-9]+(?:p[0-9]+)?$', '');
+    solver_name_core = regexprep(solver_name_base, '-lc1em[0-9]+$', '');
+    tokens = regexp(solver_name_core, expression, 'tokens', 'once');
+    matched = ~isempty(tokens);
+    if ~matched
+        func_window_size = NaN;
+        func_tol = NaN;
+        grad_window_size = NaN;
+        grad_tol = NaN;
+        use_function_stop = false;
+        use_gradient_stop = false;
+        lipschitz_constant = NaN;
+        use_gradient_reference_reliability = false;
+        grad_reference_consistency_tol = NaN;
+        grad_reference_scale_factor = NaN;
+        return
+    end
+
+    stop_kind = tokens{1};
+    func_window_size = str2double(tokens{2});
+    func_tol = 10^(-str2double(tokens{3}));
+    grad_window_size = str2double(tokens{4});
+    grad_tol = 10^(-str2double(tokens{5}));
+    use_function_stop = ~strcmp(stop_kind, 'gradient-stop');
+    use_gradient_stop = ~strcmp(stop_kind, 'function-stop');
+    lc_tokens = regexp(solver_name_full, ...
+        '-lc1em([0-9]+)(?:-grc[0-9]+(?:p[0-9]+)?)?$', ...
+        'tokens', 'once');
+    if isempty(lc_tokens)
+        lipschitz_constant = 1e3;
+    else
+        lipschitz_constant = 10^str2double(lc_tokens{1});
+    end
+    grc_tokens = regexp(solver_name_full, ...
+        '-grc([0-9]+(?:p[0-9]+)?)(?:-grs[0-9]+(?:p[0-9]+)?)?$', ...
+        'tokens', 'once');
+    use_gradient_reference_reliability = ~isempty(grc_tokens);
+    if use_gradient_reference_reliability
+        grad_reference_consistency_tol = str2double( ...
+            strrep(grc_tokens{1}, 'p', '.'));
+    else
+        grad_reference_consistency_tol = 0.1;
+    end
+    grs_tokens = regexp(solver_name_full, ...
+        '-grs([0-9]+(?:p[0-9]+)?)$', 'tokens', 'once');
+    if isempty(grs_tokens)
+        grad_reference_scale_factor = 1e-3;
+    else
+        grad_reference_scale_factor = str2double( ...
+            strrep(grs_tokens{1}, 'p', '.'));
+    end
+
+end
+
+function [matched, c_x, c_tau, use_acceleration, use_unit_steps, ...
+        max_eval_factor] = ...
         parse_auto_alpha_init_solver_name(solver_name)
 
-    expression = ['^auto-cx-([0-9]+(?:p[0-9]+)?)-', ...
+    candidate_expression = ['^auto-cx-([0-9]+(?:p[0-9]+)?)-', ...
         'ctau-([0-9]+(?:p[0-9]+)?)-', ...
-        '(plain|accelerated-all-on)-500n$'];
-    tokens = regexp(char(solver_name), expression, 'tokens', 'once');
+        '(plain|accelerated-all-on)-([0-9]+)n$'];
+    unit_expression = '^unit-(plain|accelerated-all-on)-([0-9]+)n$';
+    tokens = regexp(char(solver_name), candidate_expression, 'tokens', 'once');
+    unit_tokens = regexp(char(solver_name), unit_expression, 'tokens', 'once');
+    use_unit_steps = isempty(tokens) && ~isempty(unit_tokens);
+    if use_unit_steps
+        tokens = {'1', '1', unit_tokens{1}, unit_tokens{2}};
+    end
     matched = ~isempty(tokens);
     c_x = NaN;
     c_tau = NaN;
     use_acceleration = false;
+    use_unit_steps = use_unit_steps && matched;
+    max_eval_factor = NaN;
     if ~matched
         return;
     end
@@ -1874,6 +2049,29 @@ function [matched, c_x, c_tau, use_acceleration] = ...
             'Automatic initial-step coefficients must be finite and positive.');
     end
     use_acceleration = strcmp(tokens{3}, 'accelerated-all-on');
+    max_eval_factor = str2double(tokens{4});
+    if ~(isfinite(max_eval_factor) && max_eval_factor > 0 && ...
+            max_eval_factor == floor(max_eval_factor))
+        error('profile_optiprofiler:InvalidAutoAlphaBudget', ...
+            'The automatic initial-step budget must be a positive integer.');
+    end
+
+end
+
+function matched = is_auto_alpha_init_solver_name(solver_name)
+
+    [matched, ~, ~, ~, ~, ~] = parse_auto_alpha_init_solver_name(solver_name);
+
+end
+
+function max_eval_factor = auto_alpha_init_budget_from_name(solver_name)
+
+    [matched, ~, ~, ~, ~, max_eval_factor] = ...
+        parse_auto_alpha_init_solver_name(solver_name);
+    if ~matched
+        error('profile_optiprofiler:InvalidAutoAlphaSolverName', ...
+            'Expected an automatic initial-step candidate label.');
+    end
 
 end
 

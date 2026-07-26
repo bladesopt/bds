@@ -25,6 +25,17 @@ switch constant_name
         constant_value = 1e-6;
     case "lipschitz_constant"
         constant_value = 1e3;
+    case "use_gradient_reference_reliability"
+        constant_value = true;
+    case "grad_reference_consistency_tol"
+        constant_value = 0.1;
+    case "grad_reference_finite_difference_error_tol"
+        % For theta=shrink=0.5 this reproduces the historical raw threshold 0.1.
+        constant_value = 1/30;
+    case "grad_reference_relative_tol"
+        constant_value = 1e-2;
+    case "grad_reference_scale_factor"
+        constant_value = 1e4;
     case "block_visiting_pattern"
         constant_value = "sorted";
     case "seed"
@@ -56,6 +67,8 @@ switch constant_name
     case "output_block_hist"
         constant_value = false;
     case "output_grad_hist"
+        constant_value = false;
+    case "output_gradient_stop_diagnostics"
         constant_value = false;
     case "iprint"
         constant_value = 0;
