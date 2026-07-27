@@ -238,6 +238,15 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                 solvers{i} = @(fun, x0) fminunc_adaptive(fun, x0, options.noise_level);
             case 'fd-bfgs'
                 solvers{i} = @fminunc_test;
+            case {'fd-bfgs-500n', 'fd_bfgs_500n'}
+                if isfield(options, 'noise_level')
+                    noise_level_for_bfgs = options.noise_level;
+                    solvers{i} = @(fun, x0) fd_bfgs_500n_test( ...
+                        fun, x0, true, noise_level_for_bfgs);
+                else
+                    solvers{i} = @(fun, x0) fd_bfgs_500n_test( ...
+                        fun, x0, false, []);
+                end
             case {'bfgs-200n', 'bfgs_200n'}
                 if isfield(options, 'noise_level')
                     noise_level_for_bfgs = options.noise_level;
@@ -251,10 +260,14 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                 solvers{i} = @praxis_test;
             case 'nelder-mead'
                 solvers{i} = @fminsearch_test;
+            case {'nelder-mead-500n', 'nelder_mead_500n'}
+                solvers{i} = @fminsearch_test;
             case {'nelder-mead-200n', 'nelder_mead_200n', 'fminsearch-200n', 'fminsearch_200n'}
                 solvers{i} = @fminsearch_200n_test;
             case 'ds'
                 solvers{i} = @ds_test;
+            case {'ds-500n', 'ds_500n'}
+                solvers{i} = @ds_500n_test;
             case {'ds-200n', 'ds_200n'}
                 solvers{i} = @ds_200n_test;
             case {'ds-baseline-200n', 'ds_baseline_200n'}
@@ -416,13 +429,19 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                 solvers{i} = @cbds_construct_directions_from_x0_test;
             case 'pds'
                 solvers{i} = @pds_test;
+            case {'pds-500n', 'pds_500n'}
+                solvers{i} = @pds_500n_test;
             case {'pds-200n', 'pds_200n'}
                 solvers{i} = @pds_200n_test;
             case 'bfo'
                 solvers{i} = @bfo_test;
+            case {'bfo-500n', 'bfo_500n'}
+                solvers{i} = @bfo_test;
             case {'bfo-200n', 'bfo_200n'}
                 solvers{i} = @bfo_200n_test;
             case 'newuoa'
+                solvers{i} = @newuoa_test;
+            case {'newuoa-500n', 'newuoa_500n'}
                 solvers{i} = @newuoa_test;
             case {'newuoa-200n', 'newuoa_200n'}
                 solvers{i} = @newuoa_200n_test;
@@ -478,8 +497,14 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                     fun, x0, false, false, 20, 1e-6, 1, 1e-6);
             case {'auto-accelerated-all-on-500n-default-combined-stop', ...
                     'auto_accelerated_all_on_500n_default_combined_stop'}
-                solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
-                    fun, x0, true, true, 20, 1e-6, 1, 1e-6);
+                solvers{i} = @accelerated_auto_combined_stop_500n_test;
+            case {'accelerated-unit-500n', 'accelerated_unit_500n'}
+                solvers{i} = @accelerated_unit_500n_test;
+            case {'accelerated-auto-500n', 'accelerated_auto_500n'}
+                solvers{i} = @accelerated_auto_500n_test;
+            case {'accelerated-auto-combined-stop-500n', ...
+                    'accelerated_auto_combined_stop_500n'}
+                solvers{i} = @accelerated_auto_combined_stop_500n_test;
             otherwise
                 [is_stopping_candidate, func_window_size, func_tol, ...
                     grad_window_size, grad_tol, use_function_stop, ...
@@ -1001,6 +1026,18 @@ function x = bfgs_200n_test(fun, x0, with_gradient, noise_level)
 
 end
 
+function x = fd_bfgs_500n_test(fun, x0, with_gradient, noise_level)
+
+    options.MaxObjectiveEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.with_gradient = with_gradient;
+    if with_gradient
+        options.noise_level = noise_level;
+    end
+    x = fminunc_budgeted_wrapper(fun, x0, options);
+
+end
+
 function x = praxis_test(fun, x0)
     %xtol = eps;
     xtol = 1e-6;
@@ -1084,6 +1121,14 @@ function x = ds_randomized_orthogonal_test(fun, x0)
     option.direction_set = Q;
     x = bds(fun, x0, option);
     
+end
+
+function x = ds_500n_test(fun, x0)
+
+    option.Algorithm = 'ds';
+    option.MaxFunctionEvaluations = 500*length(x0);
+    x = bds(fun, x0, option);
+
 end
 
 function x = ds_randomized_orthogonal_test_noisy(fun, x0, is_noisy)
@@ -1633,6 +1678,15 @@ function x = pds_test(fun, x0)
     
 end
 
+function x = pds_500n_test(fun, x0)
+
+    option.expand = 2;
+    option.shrink = 0.5;
+    option.MaxFunctionEvaluations = 500*length(x0);
+    x = pds(fun, x0, option);
+
+end
+
 function x = pds_200n_test(fun, x0)
 
     option.expand = 2;
@@ -1749,12 +1803,21 @@ function ensure_bfo_on_path()
     end
 
     home_dir = char(java.lang.System.getProperty('user.home'));
-    bfo_root = fullfile(home_dir, 'local', 'BFO');
-    candidate_paths = { ...
-        bfo_root, ...
-        fullfile(bfo_root, 'src'), ...
-        fullfile(bfo_root, 'matlab') ...
-    };
+    bfo_roots = { ...
+        getenv('BDS_BFO_ROOT'), ...
+        fullfile(home_dir, 'local', 'BFO'), ...
+        fullfile(home_dir, 'Documents', 'Nutstore', 'Transfer', ...
+        'optiprofiler_transfer'), ...
+        fullfile(home_dir, 'Documents', 'optiprofiler_results')};
+    candidate_paths = {};
+    for i_root = 1:numel(bfo_roots)
+        if ~isempty(bfo_roots{i_root})
+            candidate_paths = [candidate_paths, { ...
+                bfo_roots{i_root}, ...
+                fullfile(bfo_roots{i_root}, 'src'), ...
+                fullfile(bfo_roots{i_root}, 'matlab')}]; %#ok<AGROW>
+        end
+    end
 
     for i_path = 1:numel(candidate_paths)
         if exist(candidate_paths{i_path}, 'dir')
@@ -1778,9 +1841,9 @@ function ensure_nomad_on_path()
     home_dir = char(java.lang.System.getProperty('user.home'));
     nomad_root = fullfile(home_dir, 'local', 'nomad');
     candidate_paths = { ...
+        fullfile(nomad_root, 'build', 'release', 'lib'), ...
         fullfile(nomad_root, 'interfaces', 'Matlab_MEX', 'Functions'), ...
-        fullfile(nomad_root, 'build', 'release', 'interfaces', 'Matlab_MEX'), ...
-        fullfile(nomad_root, 'build', 'release', 'lib') ...
+        fullfile(nomad_root, 'build', 'release', 'interfaces', 'Matlab_MEX') ...
     };
 
     for i_path = 1:numel(candidate_paths)
@@ -1859,6 +1922,62 @@ function x = accelerated_bds_options_budget_limited_test(fun, x0)
     options.use_momentum_extrapolation = true;
     options.StepTolerance = 1e-12;
     x = accelerated_bds_options(fun, x0, options);
+
+end
+
+function x = accelerated_unit_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 1;
+    x = accelerated_bds_options(fun, x0, options);
+
+end
+
+function x = accelerated_auto_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 'auto';
+    x = accelerated_bds_options(fun, x0, options);
+
+end
+
+function x = accelerated_auto_combined_stop_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 'auto';
+    options.use_function_value_stop = true;
+    options.func_window_size = 20;
+    options.func_tol = 1e-6;
+    options.use_estimated_gradient_stop = true;
+    options.grad_window_size = 1;
+    options.grad_tol = 1e-6;
+    options.lipschitz_constant = 1e3;
+    options.use_gradient_reference_reliability = true;
+    options.grad_reference_consistency_tol = 0.1;
+    options.grad_reference_relative_tol = 1e-2;
+    x = accelerated_bds_options(fun, x0, options);
+
+end
+
+function options = accelerated_500n_profile_options(x0)
+
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.expand = 1.8;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.seed = 0;
+    options.use_productive_direction_memory = true;
+    options.use_sweep_pattern_direction = true;
+    options.use_momentum_extrapolation = true;
+    options.use_function_value_stop = false;
+    options.use_estimated_gradient_stop = false;
 
 end
 

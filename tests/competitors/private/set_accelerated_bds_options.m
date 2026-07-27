@@ -1,18 +1,19 @@
 function options = set_accelerated_bds_options(options, n, x0)
-%SET_ACCELERATED_BDS_OPTIONS Normalize options for accelerated_bds_options.
+% SET_ACCELERATED_BDS_OPTIONS Set and validate options for accelerated_bds_options.
 %
-% This helper follows the shape of BDS set_options.m for the fields currently
-% supported by accelerated_bds_options.m, while keeping the historical
-% reference defaults so that the all-on default path remains equivalent to
-% lean_evolved_bds.m.
+%   OPTIONS = SET_ACCELERATED_BDS_OPTIONS(OPTIONS, N, X0) validates the values
+%   in OPTIONS, resolves the priority of Algorithm, and sets the missing values.
 
+% We handle Algorithm early because it determines the values of num_blocks,
+% batch_size, and block_visiting_pattern.
 options = apply_algorithm_priority(options, n);
-reject_unsupported_bds_outer_options(options);
 
+% Set the maximum number of function evaluations.
 options = set_default_if_missing(options, 'MaxFunctionEvaluations', ...
     get_accelerated_bds_default_constant("MaxFunctionEvaluations_dim_factor") * n);
 options.MaxFunctionEvaluations = normalize_max_function_evaluations(options.MaxFunctionEvaluations);
 
+% Set the number of blocks and the number of blocks visited in each iteration.
 options = set_default_if_missing(options, 'num_blocks', n);
 options.num_blocks = normalize_num_blocks(options.num_blocks, n);
 options = set_default_if_missing(options, 'batch_size', options.num_blocks);
@@ -28,6 +29,7 @@ options = set_default_if_missing(options, 'direction_set', eye(n));
 options.direction_set = normalize_direction_set(options.direction_set, n);
 validate_grouped_direction_indices(options, n, options.num_blocks);
 
+% Set the options related to the termination criteria.
 options = set_default_if_missing(options, 'ftarget', get_accelerated_bds_default_constant("ftarget"));
 options.ftarget = normalize_ftarget(options.ftarget);
 options = set_default_if_missing(options, 'use_function_value_stop', ...
@@ -71,7 +73,7 @@ if has_legacy_consistency_tol
     legacy_consistency_tol = normalize_positive_real_scalar( ...
         options.grad_reference_consistency_tol, ...
         'grad_reference_consistency_tol');
-    % Interpret the legacy value as the calibrated raw threshold at theta=0.5.
+    % The legacy value is the raw threshold calibrated at theta = 0.5.
     options.grad_reference_finite_difference_error_tol = ...
         legacy_consistency_tol * (0.5^2) / (1 - 0.5^2);
 else
@@ -103,14 +105,18 @@ else
 end
 options.grad_reference_relative_tol = normalize_positive_real_scalar( ...
     options.grad_reference_relative_tol, 'grad_reference_relative_tol');
+
+% Set the threshold for the step sizes.
 options = set_default_if_missing(options, 'StepTolerance', ...
     get_accelerated_bds_default_constant("StepTolerance"));
 options.StepTolerance = normalize_step_tolerance(options.StepTolerance, options.num_blocks);
 
+% Set the initial step sizes.
 options = set_default_if_missing(options, 'alpha_init', ...
     get_accelerated_bds_default_constant("alpha_init"));
 options.alpha_init = normalize_alpha_init(options.alpha_init, options.num_blocks, n, x0, options.StepTolerance);
 
+% Set the expanding and shrinking factors.
 options = set_default_if_missing(options, 'is_noisy', ...
     get_accelerated_bds_default_constant("is_noisy"));
 options.is_noisy = normalize_logical_scalar(options.is_noisy, 'is_noisy');
@@ -120,17 +126,14 @@ options.expand = normalize_expand(options.expand);
 options = set_default_if_missing(options, 'shrink', default_shrink);
 options.shrink = normalize_shrink(options.shrink);
 
-% The central-difference estimates use step sizes h and theta*h, where theta is
-% the public shrink factor after an unsuccessful poll. For a smooth objective,
-% the leading central-difference error is O(h^2). A Richardson-style estimate
-% therefore scales the fine-estimate error proxy by theta^2/(1-theta^2). We
-% keep that proxy below the user-facing finite-difference error tolerance, so
-% the raw consistency threshold is theta-aware. At the historical default
-% theta=0.5 and legacy raw threshold 0.1, the calibrated tolerance is 1/30.
+% Two estimates at the same base point use h and shrink*h. The leading error
+% of a central difference is O(h^2), so the consistency threshold should be
+% adjusted when the user changes shrink. The default gives 0.1 when shrink=0.5.
 options.grad_reference_consistency_tol = ...
     options.grad_reference_finite_difference_error_tol ...
     * (1 - options.shrink^2) / options.shrink^2;
 
+% Set the remaining polling and randomization options.
 options = set_default_if_missing(options, 'forcing_function', ...
     get_accelerated_bds_default_constant("forcing_function"));
 options.forcing_function = normalize_forcing_function(options.forcing_function);
@@ -146,6 +149,7 @@ options.cycling_inner = normalize_cycling_inner(options.cycling_inner);
 options = set_default_if_missing(options, 'seed', get_accelerated_bds_default_constant("seed"));
 options.seed = normalize_seed(options.seed);
 
+% Set the output and debugging options.
 options = set_default_if_missing(options, 'output_xhist', ...
     get_accelerated_bds_default_constant("output_xhist"));
 options.output_xhist = normalize_logical_scalar(options.output_xhist, 'output_xhist');
@@ -172,6 +176,7 @@ options = set_default_if_missing(options, 'debug_flag', ...
     get_accelerated_bds_default_constant("debug_flag"));
 options.debug_flag = normalize_logical_scalar(options.debug_flag, 'debug_flag');
 
+% Set the acceleration options.
 options = set_default_if_missing(options, 'productive_direction_memory_size', max(1, min(n, 5)));
 options.productive_direction_memory_size = normalize_positive_integer( ...
     options.productive_direction_memory_size, 'productive_direction_memory_size');
@@ -239,9 +244,6 @@ if ~(ischarstr(algorithm) && any(ismember(lower(string(algorithm)), algorithm_li
         'options.Algorithm must be one of: cbds, pbds, pads, rbds, ds.');
 end
 algorithm = char(lower(string(algorithm)));
-end
-
-function reject_unsupported_bds_outer_options(options) %#ok<INUSD>
 end
 
 function MaxFunctionEvaluations = normalize_max_function_evaluations(MaxFunctionEvaluations)
@@ -357,7 +359,7 @@ if ischarstr(alpha_init) && strcmpi(alpha_init, 'auto')
         error('accelerated_bds_options:InvalidAlphaInit', ...
             'options.alpha_init = "auto" is supported only when options.num_blocks equals n.');
     end
-    alpha_init = auto_alpha_init(x0, StepTolerance);
+    alpha_init = get_auto_alpha_init(x0, StepTolerance, 1, 1);
     return;
 end
 if isscalar(alpha_init)
@@ -368,33 +370,6 @@ end
 if numel(alpha_init) ~= num_blocks || any(alpha_init <= 0)
     error('accelerated_bds_options:InvalidAlphaInit', ...
         'options.alpha_init must be a positive scalar, a num_blocks-vector, or "auto".');
-end
-end
-
-function alpha_init = auto_alpha_init(x0, StepTolerance)
-n = numel(x0);
-alpha_init = zeros(n, 1);
-abs_x0 = abs(x0(:));
-tau = StepTolerance(:);
-
-nonzero_abs_x0 = abs_x0(abs_x0 > 0);
-if isempty(nonzero_abs_x0)
-    x0_scale_ratio = 1;
-else
-    x0_scale_ratio = max(nonzero_abs_x0) / min(nonzero_abs_x0);
-end
-
-for i = 1:n
-    abs_x0_i = abs_x0(i);
-    if abs_x0_i == 0
-        alpha_init(i) = 1;
-    elseif abs_x0_i <= 1
-        alpha_init(i) = max(abs_x0_i, tau(i));
-    elseif x0_scale_ratio <= 1e2
-        alpha_init(i) = abs_x0_i;
-    else
-        alpha_init(i) = 1 + log(abs_x0_i);
-    end
 end
 end
 
