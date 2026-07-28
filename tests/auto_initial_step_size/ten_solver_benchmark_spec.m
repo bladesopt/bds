@@ -55,7 +55,8 @@ spec.smoke_features = { ...
     'linearly_transformed_noisy_1e-3'};
 spec.dimension_limits = [6, 50];
 spec.problem_count = 122;
-spec.n_runs = 1;
+spec.plain_n_runs = 1;
+spec.nonplain_n_runs = 5;
 spec.seed = 0;
 spec.max_eval_factor = 500;
 spec.max_tol_order = 10;

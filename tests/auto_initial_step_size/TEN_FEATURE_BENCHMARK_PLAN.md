@@ -44,6 +44,12 @@ acceleration 全关、全开和 vector `StepTolerance` 三种情况。正式 ver
 - `linearly_transformed_noisy_1e-1`、`linearly_transformed_noisy_1e-2`、
   `linearly_transformed_noisy_1e-3`、`linearly_transformed_noisy_1e-4`。
 
+`plain` 使用 `n_runs=1`；其余九个 features 均使用 `n_runs=5`。manifest 按上述 feature
+顺序逐项记录对应的 run count，runner 在每个 feature 开始时也会将实际 `n_runs` 写入 log。
+正式实验使用服务器 MATLAB `Processes` profile 允许的全部 `60` 个 physical-core workers。
+Solver-level failure、abnormal termination 和 output fallback 均由 OptiProfiler 原生记录并在
+profiles 中处理；runner 只将其计数写入 manifest 和 log，不得因此终止整个 benchmark。
+
 本实验用于隔离 automatic initial step 的贡献，因此 optional function-value stopping 和
 gradient stopping 均关闭；其他 solver options、problem order、seeds、budgets 和
 OptiProfiler settings 对所有 configurations 保持一致。
