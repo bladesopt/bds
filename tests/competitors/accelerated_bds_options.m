@@ -865,6 +865,7 @@ for iter = 1:maxit
         fbest = fbase;
         best_direction = [];
         pattern_improved = false;
+        failed_pattern_point = [];
 
         if options.use_sweep_pattern_direction
             for i = 1:numel(factors)
@@ -887,6 +888,7 @@ for iter = 1:maxit
                     best_direction = pattern_direction;
                     pattern_improved = true;
                 else
+                    failed_pattern_point = xnew;
                     break;
                 end
                 if fnew <= ftarget
@@ -904,6 +906,9 @@ for iter = 1:maxit
                     break;
                 end
                 xnew = xbase + factors(i) * pattern_step * momentum_direction;
+                if ~isempty(failed_pattern_point) && isequal(xnew, failed_pattern_point)
+                    break;
+                end
                 [fnew, fnew_real, is_valid] = eval_fun(fun, xnew);
                 nf = nf + 1;
                 fhist(nf) = fnew_real;

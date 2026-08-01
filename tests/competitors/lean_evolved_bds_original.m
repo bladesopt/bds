@@ -1,4 +1,4 @@
-function [xopt, fopt, exitflag, output] = lean_evolved_bds(fun, x0)
+function [xopt, fopt, exitflag, output] = lean_evolved_bds_original(fun, x0)
 %LEAN_EVOLVED_BDS MATLAB port of the Python Lean Evolved BDS competitor.
 %
 % This file intentionally mirrors tests/competitors/evolved_bds_solver_lean.py
@@ -137,7 +137,6 @@ for iter = 1:maxit
         f_pat = fbase;
         best_dir = [];
         pat_improved = false;
-        failed_pattern_point = [];
 
         for idx = 1:numel(factors)
             if nf >= maxfun
@@ -153,7 +152,6 @@ for iter = 1:maxit
                 best_dir = pattern_dir;
                 pat_improved = true;
             else
-                failed_pattern_point = x_candidate;
                 break;
             end
         end
@@ -165,9 +163,6 @@ for iter = 1:maxit
                 end
                 factor = factors(idx);
                 x_candidate = xbase + factor * alpha_pat * momentum_dir;
-                if ~isempty(failed_pattern_point) && isequal(x_candidate, failed_pattern_point)
-                    break;
-                end
                 f_candidate = fun(x_candidate);
                 nf = nf + 1;
                 if f_candidate < f_pat

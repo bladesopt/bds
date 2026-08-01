@@ -6,8 +6,7 @@ function verify_bds_acceleration()
 %   1. With all acceleration switches off, accelerated_bds_options.m must
 %      match bds.m for the same Algorithm and the same explicit options.
 %   2. With all acceleration switches on and the default/CBDS base algorithm,
-%      accelerated_bds_options.m must match the fixed lean_evolved_bds.m
-%      reference.
+%      accelerated_bds_options.m must match the fixed lean_evolved_bds.m reference.
 
 path_tests = fileparts(mfilename('fullpath'));
 path_root = fileparts(path_tests);
