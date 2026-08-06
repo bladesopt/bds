@@ -107,7 +107,7 @@ options = struct();
 options.MaxFunctionEvaluations = 200 * n;
 options.StepTolerance = 1e-6;
 options.use_productive_direction_memory = variant.use_memory;
-options.use_sweep_pattern_direction = variant.use_pattern;
+options.use_iteration_pattern_step = variant.use_pattern;
 options.use_momentum_extrapolation = variant.use_momentum;
 
 end

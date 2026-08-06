@@ -12,7 +12,7 @@
 - 三个 acceleration strategies 只在 `accelerated_bds_options.m` 中维护，尚未迁移进
   `src/bds.m`：
   - `use_productive_direction_memory`
-  - `use_sweep_pattern_direction`
+  - `use_iteration_pattern_step`
   - `use_momentum_extrapolation`
 - 这三个 switches 在 `accelerated_bds_options.m` 中默认都是 `true`，从而保持与
   `lean_evolved_bds.m` 的 reference behavior 一致。将三项开关显式设为 `false`
@@ -55,7 +55,7 @@ verify_bds_acceleration
 ```matlab
 options.Algorithm = "pbds";
 options.use_productive_direction_memory = true;
-options.use_sweep_pattern_direction = true;
+options.use_iteration_pattern_step = true;
 options.use_momentum_extrapolation = true;
 ```
 

@@ -92,7 +92,7 @@ options.polling_inner = 'opportunistic';
 options.cycling_inner = 1;
 options.seed = 0;
 options.use_productive_direction_memory = true;
-options.use_sweep_pattern_direction = true;
+options.use_iteration_pattern_step = true;
 options.use_momentum_extrapolation = true;
 options.alpha_init = max(abs(x0(:)), options.StepTolerance);
 options.alpha_init(x0(:) == 0) = 1;

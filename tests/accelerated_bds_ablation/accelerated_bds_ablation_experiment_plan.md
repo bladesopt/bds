@@ -64,14 +64,14 @@ The three acceleration strategies in `accelerated_bds_options.m` are:
 | Short name | Option | Meaning |
 | --- | --- | --- |
 | memory / search step | `use_productive_direction_memory` | Try a bounded list of previously successful polling directions before the regular polling loop. This is an acceleration search step. |
-| pattern direction | `use_sweep_pattern_direction` | After a successful iteration, try the normalized total accepted iteration step as a Hooke-Jeeves style pattern direction. |
+| pattern direction | `use_iteration_pattern_step` | After a successful iteration, try the normalized total accepted iteration step as a Hooke-Jeeves style pattern direction. |
 | momentum | `use_momentum_extrapolation` | Form an exponentially averaged direction from recent successful iteration directions and try it when the pattern direction does not improve. |
 
 Naming convention:
 
 - `baseline`: all three acceleration switches are off.
 - `memory-only`: only `use_productive_direction_memory` is on.
-- `pattern-only`: only `use_sweep_pattern_direction` is on.
+- `pattern-only`: only `use_iteration_pattern_step` is on.
 - `momentum-only`: only `use_momentum_extrapolation` is on.
 - `pattern-momentum`: pattern direction and momentum are on, memory / search step is off.
 - `all-on`: all three acceleration switches are on.

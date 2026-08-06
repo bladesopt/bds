@@ -121,7 +121,7 @@ end
 function [xopt, fopt, exitflag, output] = run_accelerated_bds_no_acceleration(fun, x0, options)
 
 options.use_productive_direction_memory = false;
-options.use_sweep_pattern_direction = false;
+options.use_iteration_pattern_step = false;
 options.use_momentum_extrapolation = false;
 
 % bds.m and accelerated_bds_options.m intentionally have different historical
@@ -157,7 +157,7 @@ if use_algorithm_cbds
     accel_options.Algorithm = 'cbds';
 end
 accel_options.use_productive_direction_memory = true;
-accel_options.use_sweep_pattern_direction = true;
+accel_options.use_iteration_pattern_step = true;
 accel_options.use_momentum_extrapolation = true;
 
 % Keep the row-input/tough behavior used by the fixed reference comparison:

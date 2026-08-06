@@ -1895,7 +1895,7 @@ end
 function x = accelerated_bds_options_test(fun, x0, use_memory, use_pattern, use_momentum)
 
     options.use_productive_direction_memory = use_memory;
-    options.use_sweep_pattern_direction = use_pattern;
+    options.use_iteration_pattern_step = use_pattern;
     options.use_momentum_extrapolation = use_momentum;
     x = accelerated_bds_options(fun, x0, options);
 
@@ -1907,7 +1907,7 @@ function x = accelerated_bds_options_profile_test( ...
 
     options.Algorithm = algorithm;
     options.use_productive_direction_memory = use_memory;
-    options.use_sweep_pattern_direction = use_pattern;
+    options.use_iteration_pattern_step = use_pattern;
     options.use_momentum_extrapolation = use_momentum;
     options.MaxFunctionEvaluations = max_eval_factor*length(x0);
     options.StepTolerance = step_tolerance;
@@ -1918,7 +1918,7 @@ end
 function x = accelerated_bds_options_budget_limited_test(fun, x0)
 
     options.use_productive_direction_memory = true;
-    options.use_sweep_pattern_direction = true;
+    options.use_iteration_pattern_step = true;
     options.use_momentum_extrapolation = true;
     options.StepTolerance = 1e-12;
     x = accelerated_bds_options(fun, x0, options);
@@ -1974,7 +1974,7 @@ function options = accelerated_500n_profile_options(x0)
     options.cycling_inner = 1;
     options.seed = 0;
     options.use_productive_direction_memory = true;
-    options.use_sweep_pattern_direction = true;
+    options.use_iteration_pattern_step = true;
     options.use_momentum_extrapolation = true;
     options.use_function_value_stop = false;
     options.use_estimated_gradient_stop = false;
@@ -2007,7 +2007,7 @@ function x = auto_alpha_init_profile_test( ...
 
     if use_acceleration
         options.use_productive_direction_memory = true;
-        options.use_sweep_pattern_direction = true;
+        options.use_iteration_pattern_step = true;
         options.use_momentum_extrapolation = true;
         options.alpha_init = alpha_init;
         x = accelerated_bds_options(fun, x0, options);
@@ -2050,7 +2050,7 @@ function x = accelerated_auto_stopping_profile_test(fun, x0, ...
     options.cycling_inner = 1;
     options.seed = 0;
     options.use_productive_direction_memory = true;
-    options.use_sweep_pattern_direction = true;
+    options.use_iteration_pattern_step = true;
     options.use_momentum_extrapolation = true;
     options.alpha_init = auto_alpha_init_candidate( ...
         x0, options.StepTolerance, 1, 1);

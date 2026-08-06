@@ -131,19 +131,115 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                               different random sequences across runs.
 %
 %   The following options are related to the acceleration steps.
-%   use_productive_direction_memory
-%                               Whether to use a bounded memory of successful polling directions
-%                               before regular polling. Default: true.
-%   productive_direction_memory_size
-%                               Maximum number of successful polling directions stored in the
-%                               memory list. Default: max(1, min(n, 5)).
-%   use_sweep_pattern_direction Whether to use an iteration-level Hooke-Jeeves-style pattern step
-%                               after regular polling. Default: true.
-%   use_momentum_extrapolation  Whether to use an exponential moving average of successful
-%                               iteration-level pattern directions as a fallback search direction.
-%                               Default: true.
-%   momentum_decay              Decay factor in the momentum recursion. It should be in [0, 1).
-%                               Default: 0.6.
+%   use_productive_direction_memory   Whether to try productive search directions retained from
+%                                     previous iterations before the regular block-polling phase.
+%                                     The memory is an ordered list that is retained across
+%                                     iterations rather than reset after each iteration. Each
+%                                     entry stores a normalized productive direction together
+%                                     with the step length associated with that direction. A
+%                                     direction is considered productive if it produces an
+%                                     accepted polling update or a successful iteration-level
+%                                     acceleration step.
+%                                     The list contains at most
+%                                     productive_direction_memory_size entries. When the list
+%                                     is full and a new direction is admitted, its oldest entry
+%                                     is removed. A direction that is nearly parallel or
+%                                     antiparallel to a direction already in the list is not
+%                                     stored as a separate entry.
+%                                     At the beginning of each iteration, the retained directions
+%                                     are considered in list order before regular polling. For a
+%                                     retained direction, the algorithm evaluates a candidate point
+%                                     obtained by stepping from the current base point along that
+%                                     direction. The trial step length is the larger of the
+%                                     current mean block step size and the stored step length.
+%                                     If the candidate improves the objective function, it is
+%                                     accepted, and up to two further candidates may be evaluated
+%                                     by extrapolating farther along the same direction with
+%                                     successively doubled step lengths. The memory phase stops
+%                                     after such a productive direction is found or after all
+%                                     retained directions have been considered.
+%                                     In summary, enabling this option adds an opportunistic
+%                                     search over retained productive directions before the
+%                                     regular BDS block-polling phase.
+%                                     Default: true.
+%   productive_direction_memory_size  Maximum number of entries retained in the ordered
+%                                     productive-direction memory. This option limits the number
+%                                     of stored entries, each consisting of a direction and its
+%                                     associated step length; it does not limit the length or
+%                                     magnitude of the directions. Default: max(1, min(n, 5)).
+%   use_iteration_pattern_step        Whether to perform an additional search after the regular
+%                                     polling phase of an iteration. The search is attempted only
+%                                     when the base point at the end of the iteration has a lower
+%                                     objective value than the base point at its beginning, the
+%                                     norm of the net displacement of the base point from the
+%                                     beginning to the end of the iteration is greater than the
+%                                     largest component of StepTolerance, and function evaluations
+%                                     remain available.
+%                                     The pattern direction is the normalized net displacement of
+%                                     the base point during the current iteration. The pattern step
+%                                     length is the larger of the norm of this displacement and
+%                                     the largest component of StepTolerance. Starting from the
+%                                     current base point, the algorithm evaluates at most three
+%                                     candidate points, using step length factors 1, 2, and 4.
+%                                     The search stops at the first candidate whose objective value
+%                                     is not lower than the best value found in this phase, when
+%                                     the objective value is less than or equal to ftarget, or when
+%                                     the function evaluation budget is exhausted. If the search
+%                                     improves the objective function, the best candidate becomes
+%                                     the new base point and its direction may be stored in the
+%                                     productive direction memory.
+%                                     If use_momentum_extrapolation is enabled, the momentum vector
+%                                     is updated from the same normalized iteration displacement
+%                                     before this search, regardless of whether the pattern search
+%                                     improves the objective function.
+%                                     In summary, enabling this option adds a finite search along
+%                                     the normalized net displacement accumulated during the current
+%                                     iteration, after the regular BDS polling phase.
+%                                     Default: true.
+%   use_momentum_extrapolation        Whether to maintain a momentum direction across iterations
+%                                     and to search along that direction when appropriate. After an
+%                                     iteration has produced a lower objective value at its ending
+%                                     base point than at its starting base point, has a net base
+%                                     point displacement greater than the largest component of
+%                                     StepTolerance, and still has available function evaluations,
+%                                     its normalized net displacement is incorporated into the
+%                                     momentum vector by the recursion
+%                                     momentum = momentum_decay * momentum + ...
+%                                     (1 - momentum_decay) * pattern_direction.
+%                                     This momentum update is performed before the pattern and
+%                                     momentum candidate searches and is performed even when the
+%                                     pattern search subsequently finds an improving candidate. If
+%                                     the updated momentum vector has a norm greater than the
+%                                     largest component of StepTolerance, it is normalized to form
+%                                     the momentum direction; otherwise no momentum direction is
+%                                     available for the current iteration.
+%                                     When use_iteration_pattern_step is enabled, pattern candidates
+%                                     are evaluated first. Candidates along the momentum direction
+%                                     are evaluated only if the pattern search produces no
+%                                     improvement, the target value has not been reached, a momentum
+%                                     direction is available, and function evaluations remain
+%                                     available. When use_iteration_pattern_step is disabled, the
+%                                     momentum search is attempted directly whenever a momentum
+%                                     direction is available and the same iteration conditions hold.
+%                                     In either case, candidate points use the pattern step length
+%                                     multiplied by the factors 1, 2, and 4. The search stops at the
+%                                     first candidate whose objective value is not lower than the
+%                                     current best value, when the objective value is less than or
+%                                     equal to ftarget, or when the function evaluation budget is
+%                                     exhausted. If a momentum candidate is exactly the same point
+%                                     as a pattern candidate that has already been evaluated and
+%                                     rejected, it is skipped so that the objective function is not
+%                                     evaluated twice. If the momentum search improves the objective
+%                                     function, the best candidate becomes the new base point and
+%                                     its direction may be stored in the productive direction
+%                                     memory.
+%                                     In summary, this option updates a direction averaged over
+%                                     successful iteration displacements and may use that direction
+%                                     for an additional search after an unsuccessful pattern search
+%                                     or when the pattern search is disabled.
+%                                     Default: true.
+%   momentum_decay                    Decay factor in the momentum recursion. It should be in the
+%                                     interval [0, 1). Default: 0.6.
 %
 %   The following options are related to the termination criteria.
 %   MaxFunctionEvaluations      Maximum of function evaluations. A positive integer.
@@ -843,7 +939,7 @@ for iter = 1:maxit
     % Try a pattern direction followed, if necessary, by the momentum direction.
     if ~terminate && iteration_improved && iteration_step_norm > max(alpha_tol) ...
             && nf < MaxFunctionEvaluations ...
-            && (options.use_sweep_pattern_direction || options.use_momentum_extrapolation)
+            && (options.use_iteration_pattern_step || options.use_momentum_extrapolation)
         pattern_direction = iteration_step / iteration_step_norm;
         pattern_step = max(iteration_step_norm, max(alpha_tol));
 
@@ -867,7 +963,7 @@ for iter = 1:maxit
         pattern_improved = false;
         failed_pattern_point = [];
 
-        if options.use_sweep_pattern_direction
+        if options.use_iteration_pattern_step
             for i = 1:numel(factors)
                 if nf >= MaxFunctionEvaluations
                     break;

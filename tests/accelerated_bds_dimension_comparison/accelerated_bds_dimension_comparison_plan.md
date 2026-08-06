@@ -27,7 +27,7 @@ solvers，然后重新计算 pairwise reference、profiles 和 normalized scores
 三个 acceleration switches 为：
 
 - `use_productive_direction_memory = true`;
-- `use_sweep_pattern_direction = true`;
+- `use_iteration_pattern_step = true`;
 - `use_momentum_extrapolation = true`.
 
 旧数据中的 solver name `lean_evolved_bds_options` 是 `Accelerated BDS` 的 historical

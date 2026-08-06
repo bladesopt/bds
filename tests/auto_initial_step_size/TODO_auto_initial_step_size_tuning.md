@@ -28,7 +28,7 @@ protocol，formal close 仍需要 problem-level paired analysis 和 transformed 
 `alpha_init = "auto"` 选择一个固定 coefficient pair：
 
 - `use_productive_direction_memory = true`；
-- `use_sweep_pattern_direction = true`；
+- `use_iteration_pattern_step = true`；
 - `use_momentum_extrapolation = true`。
 
 本研究直接在这一 accelerated all-on solver 上调参，不再先对 plain BDS 分阶段筛选，
@@ -143,7 +143,7 @@ primary run 冻结为以下配置：
 - BDS `seed = 0`；
 - `use_productive_direction_memory = true`；
 - `productive_direction_memory_size = max(1,min(N,5))`；
-- `use_sweep_pattern_direction = true`；
+- `use_iteration_pattern_step = true`；
 - `use_momentum_extrapolation = true`；
 - `momentum_decay = 0.6`。
 
