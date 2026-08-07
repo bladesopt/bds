@@ -165,7 +165,7 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %   productive_direction_memory_size  Maximum number of entries retained in the ordered
 %                                     productive-direction memory. This option limits the number
 %                                     of stored entries, each consisting of a direction and its
-%                                     associated step length; it does not limit the length or
+%                                     associated step length. It does not limit the length or
 %                                     magnitude of the directions. Default: max(1, min(n, 5)).
 %   use_iteration_pattern_step        Whether to perform an additional search after the regular
 %                                     polling phase of an iteration. The search is attempted only
@@ -203,7 +203,7 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                                     point displacement greater than the largest component of
 %                                     StepTolerance, and still has available function evaluations,
 %                                     its normalized net displacement is incorporated into the
-%                                     momentum vector by the recursion
+%                                     momentum vector by the update
 %                                     momentum = momentum_decay * momentum + ...
 %                                     (1 - momentum_decay) * pattern_direction.
 %                                     This momentum update is performed before the pattern and
@@ -211,7 +211,7 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                                     pattern search subsequently finds an improving candidate. If
 %                                     the updated momentum vector has a norm greater than the
 %                                     largest component of StepTolerance, it is normalized to form
-%                                     the momentum direction; otherwise no momentum direction is
+%                                     the momentum direction. Otherwise, no momentum direction is
 %                                     available for the current iteration.
 %                                     When use_iteration_pattern_step is enabled, pattern candidates
 %                                     are evaluated first. Candidates along the momentum direction
@@ -238,8 +238,47 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                                     for an additional search after an unsuccessful pattern search
 %                                     or when the pattern search is disabled.
 %                                     Default: true.
-%   momentum_decay                    Decay factor in the momentum recursion. It should be in the
-%                                     interval [0, 1). Default: 0.6.
+%   momentum_decay                    Weight assigned to the previous momentum vector in the
+%                                     momentum update
+%                                     momentum = momentum_decay * momentum + ...
+%                                     (1 - momentum_decay) * pattern_direction.
+%                                     At the start of the solver, the momentum vector is initialized
+%                                     to the zero vector. After regular polling, the algorithm
+%                                     updates the momentum vector when the current iteration ends
+%                                     with a lower base point objective value than at its beginning,
+%                                     the norm of the net base point displacement exceeds the
+%                                     largest component of StepTolerance, and function evaluations
+%                                     remain available. The first iteration satisfying all three
+%                                     conditions produces a momentum vector directly from its
+%                                     pattern_direction. Each later iteration satisfying all three
+%                                     conditions combines its new pattern_direction with the
+%                                     momentum vector retained from earlier iterations. The momentum
+%                                     vector can therefore incorporate directions from multiple
+%                                     iterations after the second such update.
+%                                     Each momentum update first computes an updated momentum vector
+%                                     by multiplying the retained momentum vector by momentum_decay,
+%                                     multiplying the current pattern_direction by
+%                                     1 - momentum_decay, and adding the two resulting vectors. The
+%                                     algorithm then computes the norm of the updated momentum vector
+%                                     and creates momentum_direction by normalizing the updated vector
+%                                     only when its norm is greater than the largest component of
+%                                     StepTolerance. If the norm does not exceed the largest component
+%                                     of StepTolerance, the updated momentum vector is retained for
+%                                     later updates, but no momentum_direction is available for the
+%                                     current iteration and no search is performed along the momentum
+%                                     direction.
+%                                     The retained momentum vector summarizes normalized net
+%                                     displacement directions from earlier iterations.
+%                                     The coefficient momentum_decay multiplies the retained
+%                                     momentum vector, while 1 - momentum_decay multiplies the
+%                                     normalized net displacement of the current iteration. The
+%                                     momentum update is applied before normalization.
+%                                     With momentum_decay = 0, every update uses only the current
+%                                     pattern_direction and retains no information from earlier
+%                                     iterations. The parameter controls only the momentum update.
+%                                     It does not change the pattern step length or the candidate step
+%                                     factors.
+%                                     Default: 0.6.
 %
 %   The following options are related to the termination criteria.
 %   MaxFunctionEvaluations      Maximum of function evaluations. A positive integer.
