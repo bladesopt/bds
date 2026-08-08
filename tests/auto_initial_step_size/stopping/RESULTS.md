@@ -10,16 +10,14 @@ options.use_function_value_stop = false;
 options.use_estimated_gradient_stop = true;
 options.grad_window_size = 1;
 options.grad_tol = 1e-6;
-options.use_gradient_reference_reliability = true;
-options.grad_reference_consistency_tol = 0.1;
+options.use_gradient_reference_consistency = true;
+options.grad_reference_finite_difference_error_tol = 1/30;
 options.grad_reference_relative_tol = 1e-2;
 ```
 
 最后两个 gradient parameters 的算法语义是：先要求同一 `xbase` 上两个连续 gradient
 estimates 的 relative difference 不超过 `0.1`，才允许初始化 reliable reference；随后
-使用 reference-relative tolerance `rho=1e-2`。历史实验 label 中的
-`grad_reference_scale_factor=10000` 只是 `rho/grad_tol` 的兼容 encoding；正式 solver
-option 直接表达 `rho`。
+使用 reference-relative tolerance `rho=1e-2`。正式 solver option 直接表达 `rho`。
 
 该 pure-gradient strategy 在 solver 内不增加任何 function evaluation。它只复用正常
 polling 已经得到的 points 与 function values；true gradient 仅用于离线 failure diagnosis。

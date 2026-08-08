@@ -101,9 +101,10 @@ options.use_estimated_gradient_stop = true;
 options.grad_window_size = 1;
 options.grad_tol = 1e-6;
 options.lipschitz_constant = 1e3;
-options.use_gradient_reference_reliability = true;
-options.grad_reference_consistency_tol = consistency_tolerance;
-options.grad_reference_scale_factor = reference_scale_factor;
+options.use_gradient_reference_consistency = true;
+options.grad_reference_finite_difference_error_tol = ...
+    consistency_tolerance * (0.5^2) / (1 - 0.5^2);
+options.grad_reference_relative_tol = reference_scale_factor * options.grad_tol;
 options.output_gradient_stop_diagnostics = true;
 
 end

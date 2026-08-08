@@ -217,12 +217,12 @@ targets，而 `rho=1.15e-2` 在 `235` 停止并失败。这给出了真实 solve
 ```text
 grad_window_size = 1
 grad_tol = 1e-6
-grad_reference_consistency_tol = 0.1
+grad_reference_finite_difference_error_tol = 1/30
 reference-relative tolerance rho = 1e-2
 ```
 
 历史实验代码中 `rho=1e-2` 等价于
-`grad_reference_scale_factor=10000` 与 `grad_tol=1e-6` 的乘积。正式 solver option 已改为
+`grad_reference_relative_tol=1e-2`。正式 solver option 使用
 直接输入 `grad_reference_relative_tol=1e-2`；reference threshold 是
 `rho*max(1,reliable_reference_grad_norm)`。`10000` 只保留为历史 label 的兼容
 encoding，不是 problem-dependent constant。

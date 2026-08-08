@@ -281,81 +281,61 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                                     Default: 0.6.
 %
 %   The following options are related to the termination criteria.
-%   MaxFunctionEvaluations      Maximum of function evaluations. A positive integer.
-%                               Default: 200*length(x0).
-%   ftarget                     Target of the function value. If the function value is smaller than
-%                               or equal to ftarget, then the algorithm terminates.
-%                               ftarget should be a real number.
-%                               Default: -Inf.
-%   StepTolerance               Termination threshold for step size. The algorithm terminates
-%                               when the step size for each block falls below their corresponding
-%                               value. It can be a nonnegative scalar (applied to all blocks) or a
-%                               vector with length equal to the number of blocks.
-%                               Default: 1e-6.
-%   use_function_value_stop     Whether to use the function value to stop the algorithm. If it is
-%                               true, then the algorithm will stop when the function value does not
-%                               change significantly over the last func_window_size iterations.
-%                               It is an optional termination criterion.
-%                               Default: false.
-%   func_window_size            The number of iterations to consider when checking
-%                               whether the function value has changed significantly.
-%                               It should be a positive integer.
-%                               Default: 20.
-%   func_tol                    Tolerance for the function value change. The algorithm checks
-%                               whether the change in the function value over the last
-%                               func_window_size iterations falls within the range
-%                               [func_tol * 1e-3, func_tol]. If the change is smaller than this
-%                               range, the algorithm terminates.
-%                               It should be a positive number.
-%                               Default: 1e-6.
-%   use_estimated_gradient_stop Whether to use the estimated gradient to stop the algorithm. If it
-%                               is true and the algorithm is not terminated by other criteria, then
-%                               the algorithm will stop when the estimated gradient is sufficiently
-%                               small over the last grad_window_size estimated gradients.
-%                               It is an optional termination criterion.
-%                               Default: false.
-%   grad_window_size            The number of estimated gradients to consider when checking
-%                               whether the estimated gradient has changed significantly.
-%                               It should be a positive integer.
-%                               Default: 1.
-%   grad_tol                    Tolerance for the estimated gradient norm. The algorithm checks
-%                               whether the norm of the estimated gradient over the last
-%                               grad_window_size iterations falls within the range
-%                               [grad_tol * 1e-3, grad_tol]. If the norm is smaller than this
-%                               range, the algorithm terminates.
-%                               It should be a positive number.
-%                               Default: 1e-6.
-%   lipschitz_constant          An estimate of the Lipschitz constant of the objective function.
-%                               This parameter is utilized to compute the gradient error bound
-%                               when the option use_estimated_gradient_stop is true.
-%                               Users are encouraged to provide a problem-specific estimate if
-%                               available, as this can enhance the reliability of the gradient
-%                               error bound.
-%                               The value must be a positive scalar.
-%                               Default: 1e3.
-%   use_gradient_reference_reliability
-%                               Whether the scale reference for gradient stopping requires two
-%                               consecutive, consistent estimates at the same base point. Both
-%                               estimates reuse ordinary poll evaluations. Default: true.
-%   grad_reference_finite_difference_error_tol
-%                               Relative error proxy for the finer of two central-difference
-%                               estimates used to initialize a reliable gradient reference.
-%                               If the estimates use steps h and theta*h, the raw consistency
-%                               threshold is scaled as
-%                               tol*(1-theta^2)/theta^2, with theta equal to the public shrink
-%                               factor. Default: 1/30, which gives the historical raw threshold
-%                               0.1 when shrink=0.5.
-%   grad_reference_consistency_tol
-%                               Legacy raw threshold calibrated at shrink=0.5. If supplied, it
-%                               is converted to grad_reference_finite_difference_error_tol and
-%                               then made theta-aware. Do not specify it together with the new
-%                               finite-difference error tolerance.
-%   grad_reference_relative_tol Reference-relative tolerance rho for gradient stopping. The
-%                               reference threshold is rho*max(1, reliable_reference_grad_norm).
-%                               Default: 1e-2.
-%   grad_reference_scale_factor Legacy experiment option interpreted as
-%                               grad_reference_relative_tol/grad_tol. Do not specify it together
-%                               with grad_reference_relative_tol.
+%   MaxFunctionEvaluations                       Maximum number of function evaluations. A positive
+%                                                integer.
+%                                                Default: 200*length(x0).
+%   ftarget                                      Target function value. The algorithm terminates when
+%                                                the function value is less than or equal to ftarget.
+%                                                ftarget should be a real number.
+%                                                Default: -Inf.
+%   StepTolerance                                Termination threshold for the step size of each block.
+%                                                A nonnegative scalar applies to all blocks. A vector
+%                                                must have one value for each block.
+%                                                Default: 1e-6.
+%   use_function_value_stop                      Whether to stop when the function value changes little
+%                                                over the last func_window_size iterations. This is an
+%                                                optional termination criterion.
+%                                                Default: false.
+%   func_window_size                             Number of iterations used for the function-value
+%                                                stopping test. It should be a positive integer.
+%                                                Default: 20.
+%   func_tol                                     Tolerance for the change in function value. The change
+%                                                over the last func_window_size iterations is compared
+%                                                with [func_tol * 1e-3, func_tol].
+%                                                Default: 1e-6.
+%   use_estimated_gradient_stop                  Whether to stop when the estimated gradient is small
+%                                                over the last grad_window_size estimates. This is an
+%                                                optional termination criterion.
+%                                                Default: false.
+%   grad_window_size                             Number of estimated gradients used for the gradient
+%                                                stopping test. It should be a positive integer.
+%                                                Default: 1.
+%   grad_tol                                     Tolerance for the estimated gradient norm. The norms
+%                                                over the last grad_window_size estimates are compared
+%                                                with [grad_tol * 1e-3, grad_tol].
+%                                                Default: 1e-6.
+%   lipschitz_constant                           Estimate of the objective function's Lipschitz constant.
+%                                                It is used to compute the gradient error bound when
+%                                                use_estimated_gradient_stop is true. The value must be
+%                                                a positive scalar.
+%                                                Default: 1e3.
+%   use_gradient_reference_consistency           Whether to require two consecutive gradient estimates
+%                                                at the same base point to be consistent before
+%                                                initializing the gradient reference scale. Both
+%                                                estimates reuse ordinary poll evaluations.
+%                                                Default: true.
+%   grad_reference_finite_difference_error_tol   Relative error proxy for the finer of two central
+%                                                finite-difference estimates used to initialize the
+%                                                gradient reference scale. If the estimates use steps h
+%                                                and theta*h, the raw consistency threshold is
+%                                                tol*(1-theta^2)/theta^2, where theta is the public shrink
+%                                                factor. The default gives raw threshold 0.1 when
+%                                                shrink=0.5.
+%                                                Default: 1/30.
+%   grad_reference_relative_tol                  Relative tolerance rho for the gradient stopping
+%                                                threshold. The reference-relative threshold is
+%                                                rho*max(1, reliable_reference_grad_norm).
+%                                                Default: 1e-2.
 %
 %   The following options are related to output and debugging.
 %   output_xhist                Whether to output the history of points visited.
@@ -1160,15 +1140,15 @@ for iter = 1:maxit
                 reference_same_point = false;
                 reference_consistency_ratio = nan;
                 reference_candidate_reliable = ...
-                    ~options.use_gradient_reference_reliability;
+                    ~options.use_gradient_reference_consistency;
                 if ~isempty(previous_gradient)
                     reference_same_point = isequal(xbase, previous_gradient_x);
                     reference_consistency_ratio = norm(grad - previous_gradient) / ...
                         max([1, norm(grad), norm(previous_gradient)]);
-                    if options.use_gradient_reference_reliability
+                    if options.use_gradient_reference_consistency
                         reference_candidate_reliable = reference_same_point ...
                             && reference_consistency_ratio ...
-                                <= options.grad_reference_consistency_tol;
+                                <= options.grad_reference_raw_tol;
                     end
                 end
 
