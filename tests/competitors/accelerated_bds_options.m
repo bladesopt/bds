@@ -319,61 +319,116 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %                                                use_estimated_gradient_stop is true. The value must be
 %                                                a positive scalar.
 %                                                Default: 1e3.
-%   use_gradient_reference_consistency           Whether to require two consecutive gradient estimates
-%                                                at the same base point to be consistent before
-%                                                initializing the gradient reference scale. Both
-%                                                estimates reuse ordinary poll evaluations.
+%   use_gradient_reference_consistency           Whether to require a consistency check before
+%                                                initializing the gradient reference scale. The
+%                                                current gradient estimate, grad, is compared with
+%                                                previous_gradient, the estimate retained from the
+%                                                preceding iteration that produced a valid gradient
+%                                                estimate. Both estimates must come from iterations
+%                                                whose polling phase did not obtain a sufficient
+%                                                decrease. The two estimates must be computed at
+%                                                exactly the same base point xbase. Their relative
+%                                                difference is computed as
+%                                                norm(grad - previous_gradient) /
+%                                                max(1, norm(grad), norm(previous_gradient)).
+%                                                The consistency check passes only when this ratio is
+%                                                less than or equal to grad_reference_raw_tol. Both
+%                                                gradient estimates reuse ordinary polling evaluations,
+%                                                so the check does not require extra function
+%                                                evaluations. Passing the consistency check is
+%                                                necessary but not sufficient to initialize the
+%                                                gradient reference scale. The separate gradient
+%                                                error bound test must also pass.
 %                                                Default: true.
-%   grad_reference_finite_difference_error_tol   Relative error proxy for the finer of two central
-%                                                finite-difference estimates used to initialize the
-%                                                gradient reference scale. If the estimates use steps h
-%                                                and theta*h, the raw consistency threshold is
-%                                                tol*(1-theta^2)/theta^2, where theta is the public shrink
-%                                                factor. The default gives raw threshold 0.1 when
-%                                                shrink=0.5.
+%   grad_reference_finite_difference_error_tol   Tolerance for the relative finite difference error
+%                                                inferred by comparing two gradient estimates at the
+%                                                same base point. Each estimate uses ordinary polling
+%                                                evaluations and the current step size of every visited
+%                                                block. The step size for block i in the second estimate
+%                                                is the corresponding step size in the first estimate
+%                                                multiplied by shrink. Polling directions and visited
+%                                                blocks can differ between the two iterations because
+%                                                the solver may select different batches. The threshold
+%                                                conversion uses the leading truncation term of the
+%                                                central difference formula. To see the conversion,
+%                                                consider a fixed direction d_i with step h_i in the
+%                                                first estimate and theta*h_i in the second, where theta
+%                                                is the public shrink factor. The leading error of the
+%                                                first directional estimate is proportional to h_i^2.
+%                                                Replacing h_i by theta*h_i changes the leading error
+%                                                to theta^2*e_i. The leading difference between the two
+%                                                directional estimates is therefore (1-theta^2)*e_i,
+%                                                while the leading error in the second estimate is
+%                                                theta^2*e_i. The second directional error is consequently
+%                                                estimated from the difference by the factor
+%                                                theta^2/(1-theta^2). The solver applies the same factor
+%                                                to calibrate the consistency ratio between grad and
+%                                                previous_gradient after gradient reconstruction. If
+%                                                this option is tol, the corresponding raw consistency
+%                                                threshold is tol*(1-theta^2)/theta^2, stored as
+%                                                grad_reference_raw_tol. The conversion is a leading
+%                                                order calibration for the reconstructed gradient
+%                                                consistency ratio, not an exact error identity for the
+%                                                complete reconstructed gradient. The derivation applies
+%                                                to general polling directions and does not require an
+%                                                orthogonal or coordinate basis. When
+%                                                use_gradient_reference_consistency is true, the
+%                                                consistency ratio between grad and previous_gradient
+%                                                is compared with grad_reference_raw_tol. With
+%                                                shrink=0.5, the default value gives
+%                                                grad_reference_raw_tol = 0.1.
 %                                                Default: 1/30.
-%   grad_reference_relative_tol                  Relative tolerance rho for the gradient stopping
-%                                                threshold. The reference-relative threshold is
-%                                                rho*max(1, reliable_reference_grad_norm).
+%   grad_reference_relative_tol                  Tolerance rho for the reference-based gradient stopping
+%                                                threshold. After the reliable reference gradient norm has
+%                                                been initialized and stored in reference_grad_norm, the
+%                                                solver sets T_ref = rho * max(1, reference_grad_norm).
+%                                                For each entry in the gradient stopping window, it forms
+%                                                G = norm(grad) + grad_error. The gradient stopping test
+%                                                is satisfied only when every window entry satisfies at
+%                                                least one of G < T_ref and G < T_grad, where
+%                                                T_grad = grad_tol * min(1, reference_grad_norm).
+%                                                The parameter rho changes only T_ref. It does not change
+%                                                the consistency check used to initialize
+%                                                reference_grad_norm, the gradient error bound, the
+%                                                gradient window, or the second threshold T_grad.
 %                                                Default: 1e-2.
-%
-%   The following options are related to output and debugging.
-%   output_xhist                Whether to output the history of points visited.
-%                               Default: false.
-%   output_alpha_hist           Whether to output the history of step sizes.
-%                               Default: false.
-%   output_block_hist           Whether to output the history of blocks visited.
-%                               Default: false.
-%   output_grad_hist            Whether to output the history of estimated gradients
-%                               and the corresponding points. Default: false.
-%   output_gradient_stop_diagnostics
-%                               Whether to output a detailed trace of the estimated-gradient
-%                               stopping test. This development option is intended for controlled
-%                               diagnostics and does not alter the stopping criterion or add
-%                               function evaluations.
-%                               Default: false.
-%   iprint                      a flag deciding how much information will be printed during
-%                               the computation. It can be 0, 1, 2, or 3.
-%                               0: there will be no printing;
-%                               1: a message will be printed to the screen at the return,
-%                               showing the best vector of variables found and its
-%                               objective function value;
-%                               2: in addition to 1, each function evaluation with its
-%                               variables will be printed to the screen. The step size
-%                               for each block will also be printed.
-%                               3: in addition to 2, prints whether BDS satisfies the sufficient
-%                               decrease condition in each block, as well as the corresponding
-%                               decrease value for that block.
-%                               Default: 0.
-%                               This option is cited from
-%                               https://github.com/libprima/prima/blob/main/matlab/interfaces/newuoa.m.
-%   debug_flag                  A logical flag indicating whether to perform additional verifications
-%                               on the outputs after the algorithm completes. If set to true, the
-%                               algorithm will execute a series of checks to ensure the validity and
-%                               consistency of the results. This option is primarily intended for
-%                               debugging and development purposes.
-%                               Default: false.
-%
+%   The following options control solver output and diagnostic information.
+%   output_xhist                          Whether to output the history of points visited.
+%                                         Default: false.
+%   output_alpha_hist                     Whether to output the history of step sizes.
+%                                         Default: false.
+%   output_block_hist                     Whether to output the history of blocks visited.
+%                                         Default: false.
+%   output_grad_hist                      Whether to output estimated gradients and the
+%                                         corresponding points.
+%                                         Default: false.
+%   output_gradient_stop_diagnostics      Whether to output a detailed trace of the estimated-
+%                                         gradient stopping test. The trace records gradient
+%                                         estimates, error bounds, reference-scale updates,
+%                                         stopping thresholds, and the resulting stopping decisions.
+%                                         Enabling this option does not change the stopping
+%                                         criterion or add function evaluations.
+%                                         Default: false.
+%   iprint                                A flag deciding how much information will be printed
+%                                         during the computation. It can be 0, 1, 2, or 3.
+%                                         0: no information is printed.
+%                                         1: a message is printed at return, showing the best
+%                                            vector of variables found and its objective value.
+%                                         2: in addition to level 1, each function evaluation and
+%                                            its variables are printed. The step size for each
+%                                            block is also printed.
+%                                         3: in addition to level 2, the sufficient-decrease
+%                                            result and decrease value are printed for each block.
+%                                         Default: 0.
+%                                         This option is cited from
+%                                         https://github.com/libprima/prima/blob/main/matlab/
+%                                         interfaces/newuoa.m.
+%   debug_flag                            A logical flag indicating whether to perform additional
+%                                         output verifications after the algorithm completes. If
+%                                         true, the algorithm checks the validity and consistency
+%                                         of the returned results. This option is intended for
+%                                         diagnostic and development use.
+%                                         Default: false.
 %   [XOPT, FOPT] = ACCELERATED_BDS_OPTIONS(...) returns an approximate minimizer XOPT and its
 %   function value FOPT.
 %
@@ -387,28 +442,25 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %   3    The StepTolerance of the step size is reached.
 %   4    The change of the function value is small.
 %   5    The estimated gradient is small.
-%
 %   [XOPT, FOPT, EXITFLAG, OUTPUT] = ACCELERATED_BDS_OPTIONS(...) returns a
 %   structure OUTPUT with the following fields.
-%
-%   fhist            History of function values.
-%   grad_hist        History of estimated gradients (if output_grad_hist is true).
-%   grad_xhist       History of points where the estimated gradients are computed (if
-%                    output_grad_hist is true).
-%   gradient_stop_diagnostics
-%                    Detailed trace of estimated-gradient stopping checks (if
-%                    output_gradient_stop_diagnostics is true).
-%   xhist            History of points visited (if output_xhist is true).
-%   invalid_points   History of points where the function evaluation fails (if output_xhist is true).
-%   alpha_hist       History of step sizes for each iteration (present only if output_alpha_hist
-%                    is true).
-%                    Note that not all blocks are necessarily visited in every iteration. For blocks
-%                    that are skipped in an iteration, their entries in alpha_hist record the
-%                    step sizes carried forward from the previous iteration.
-%   blocks_hist      History of blocks visited (if output_block_hist is true).
-%   funcCount        The number of function evaluations.
-%   message          The information of EXITFLAG.
-%
+%   fhist                       History of function values.
+%   grad_hist                   History of estimated gradients if output_grad_hist is true.
+%   grad_xhist                  History of points where estimated gradients are computed if
+%                               output_grad_hist is true.
+%   gradient_stop_diagnostics   Detailed trace of estimated-gradient stopping checks if
+%                               output_gradient_stop_diagnostics is true.
+%   xhist                       History of points visited if output_xhist is true.
+%   invalid_points              History of points where function evaluation fails if
+%                               output_xhist is true.
+%   alpha_hist                  History of step sizes for each iteration if output_alpha_hist
+%                               is true. Not all blocks are necessarily visited in every
+%                               iteration. For a block skipped in an iteration, alpha_hist
+%                               records the step size carried forward from the previous
+%                               iteration.
+%   blocks_hist                 History of blocks visited if output_block_hist is true.
+%   funcCount                   Number of function evaluations.
+%   message                     Message corresponding to EXITFLAG.
 %   ***********************************************************************
 %   Authors:    Haitian LI (hai-tian.li@connect.polyu.hk)
 %               and Zaikun ZHANG (zhangzaikun@mail.sysu.edu.cn)
@@ -519,6 +571,7 @@ seed = options.seed;
 random_stream = RandStream("mt19937ar", "Seed", seed);
 
 productive_direction_memory_size = options.productive_direction_memory_size;
+% Initialize an empty memory whose entries store a normalized direction and its associated step.
 productive_direction_memory = struct('direction', {}, 'step', {});
 momentum = zeros(n, 1);
 momentum_decay = options.momentum_decay;
@@ -577,9 +630,9 @@ gradient_stop_diagnostics = struct( ...
     'pre_poll_memory_succeeded', {}, 'regular_poll_succeeded', {}, ...
     'post_poll_acceleration_succeeded', {}, 'iteration_improved', {});
 
-% Initialize exitflag.
-% If exitflag is not set elsewhere, then the maximum number of iterations
-% is reached, and hence we initialize exitflag to the corresponding value.
+% Initialize exitflag with the default termination status.
+% If no other termination condition overrides it, completing maxit iterations
+% leaves exitflag equal to MAXIT_REACHED.
 exitflag = get_exitflag("MAXIT_REACHED");
 
 % Evaluate the function at the starting point x0.
