@@ -717,66 +717,28 @@ xopt_all = nan(n, num_blocks);
 
 for iter = 1:maxit
 
-    % Initialize the variables used by the acceleration steps in this iteration.
+    % Save the base point and function value at the beginning of the iteration.
     xbase_iteration_start = xbase;
     fbase_iteration_start = fbase;
+
+    % Initialize flags that record accepted improvement during the iteration.
+    % iteration_improved summarizes the net decrease in fbase from the iteration
+    % start. The phase-specific flags record accepted updates from regular polling
+    % and post-poll acceleration, respectively, using each phase's own acceptance
+    % rule.
     iteration_improved = false;
-    pre_poll_memory_succeeded = false;
     regular_poll_succeeded = false;
     post_poll_acceleration_succeeded = false;
 
-    % Try the productive directions recorded from successful polling steps.
-    if options.use_productive_direction_memory && ...
-            ~isempty(productive_direction_memory) && nf < MaxFunctionEvaluations
-        alpha_average = mean(alpha_all);
-        for i = 1:numel(productive_direction_memory)
-            if nf >= MaxFunctionEvaluations
-                break;
-            end
-            direction = productive_direction_memory(i).direction;
-            step = max(alpha_average, productive_direction_memory(i).step);
-            xnew = xbase + step * direction;
-            [fnew, fnew_real, is_valid] = eval_fun(fun, xnew);
-            nf = nf + 1;
-            fhist(nf) = fnew_real;
-            if output_xhist
-                xhist(:, nf) = xnew;
-                if ~is_valid
-                    invalid_points = [invalid_points, xnew];
-                end
-            end
-            if fnew <= ftarget
-                target_reached = true;
-                terminate = true;
-                exitflag = get_exitflag("FTARGET_REACHED");
-            end
-            if fnew < fbase
-                xbase = xnew;
-                fbase = fnew;
-                iteration_improved = true;
-                pre_poll_memory_succeeded = true;
-                if target_reached
-                    break;
-                end
-                [xbase, fbase, nf, fhist, xhist, invalid_points] = try_accelerated_bds_extrapolation( ...
-                    fun, xbase, fbase, direction, step * 2.0, nf, ...
-                    MaxFunctionEvaluations, ftarget, fhist, xhist, ...
-                    invalid_points, output_xhist);
-                productive_direction_memory(i) = [];
-                productive_direction_memory = insert_accelerated_bds_memory_front( ...
-                    productive_direction_memory, direction, step);
-                if fbase <= ftarget
-                    target_reached = true;
-                    terminate = true;
-                    exitflag = get_exitflag("FTARGET_REACHED");
-                end
-                break;
-            end
-            if target_reached
-                break;
-            end
-        end
-    end
+    % Pre-poll phase: try the productive directions retained from previous iterations.
+    [xbase, fbase, nf, fhist, xhist, invalid_points, ...
+        target_reached, terminate, exitflag, ...
+        iteration_improved, pre_poll_memory_succeeded, ...
+        productive_direction_memory] = run_productive_direction_memory_phase( ...
+        fun, xbase, fbase, alpha_all, productive_direction_memory, ...
+        options.use_productive_direction_memory, nf, MaxFunctionEvaluations, ftarget, ...
+        fhist, xhist, invalid_points, output_xhist, ...
+        target_reached, terminate, exitflag, iteration_improved);
 
     % Define block_indices, a vector that specifies both the indices of the blocks
     % and the order in which they will be visited during the current iteration.
@@ -822,6 +784,8 @@ for iter = 1:maxit
 
     for i = 1:length(block_indices)
 
+        % The pre-poll phase may already reach ftarget or exhaust the function-evaluation
+        % budget. In either case, stop visiting regular-polling blocks in this iteration.
         if terminate || nf >= MaxFunctionEvaluations
             break;
         end
@@ -955,6 +919,10 @@ for iter = 1:maxit
             fbase = sub_fopt;
             regular_poll_succeeded = true;
 
+            % The regular-polling update for this block is complete. Record the accepted
+            % block displacement as one entry in the productive-direction memory. The memory
+            % can retain multiple normalized directions for consideration during the pre-poll
+            % phase of later iterations.
             block_step = sub_xopt - xbase_before_block;
             block_step_norm = norm(block_step);
             if options.use_productive_direction_memory && block_step_norm > alpha_tol(i_real)
@@ -965,8 +933,9 @@ for iter = 1:maxit
         end
     end
 
-    % Record the step size for every iteration if output_alpha_hist is true.
-    % Why iter+1? Because we record the step size for the next iteration.
+    % Record the step sizes after the current iteration if output_alpha_hist is true.
+    % The first column stores the initial step sizes. Each subsequent column stores
+    % the step sizes carried into the next iteration.
     if output_alpha_hist
         alpha_hist = [alpha_hist, alpha_all(:)];
     end
@@ -1008,112 +977,21 @@ for iter = 1:maxit
         iteration_improved = true;
     end
 
-    % Try a pattern direction followed, if necessary, by the momentum direction.
+    % Post-poll acceleration phase: try a pattern step, then momentum if needed.
     if ~terminate && iteration_improved && iteration_step_norm > max(alpha_tol) ...
             && nf < MaxFunctionEvaluations ...
             && (options.use_iteration_pattern_step || options.use_momentum_extrapolation)
-        pattern_direction = iteration_step / iteration_step_norm;
-        pattern_step = max(iteration_step_norm, max(alpha_tol));
-
-        if options.use_momentum_extrapolation
-            momentum = momentum_decay * momentum + ...
-                (1.0 - momentum_decay) * pattern_direction;
-            momentum_norm = norm(momentum);
-            if momentum_norm > max(alpha_tol)
-                momentum_direction = momentum / momentum_norm;
-            else
-                momentum_direction = [];
-            end
-        else
-            momentum_direction = [];
-        end
-
-        factors = [1.0, 2.0, 4.0];
-        xbest = xbase;
-        fbest = fbase;
-        best_direction = [];
-        pattern_improved = false;
-        failed_pattern_point = [];
-
-        if options.use_iteration_pattern_step
-            for i = 1:numel(factors)
-                if nf >= MaxFunctionEvaluations
-                    break;
-                end
-                xnew = xbase + factors(i) * pattern_step * pattern_direction;
-                [fnew, fnew_real, is_valid] = eval_fun(fun, xnew);
-                nf = nf + 1;
-                fhist(nf) = fnew_real;
-                if output_xhist
-                    xhist(:, nf) = xnew;
-                    if ~is_valid
-                        invalid_points = [invalid_points, xnew];
-                    end
-                end
-                if fnew < fbest
-                    xbest = xnew;
-                    fbest = fnew;
-                    best_direction = pattern_direction;
-                    pattern_improved = true;
-                else
-                    failed_pattern_point = xnew;
-                    break;
-                end
-                if fnew <= ftarget
-                    target_reached = true;
-                    break;
-                end
-            end
-        end
-
-        if ~target_reached && options.use_momentum_extrapolation && ...
-                ~pattern_improved && ~isempty(momentum_direction) ...
-                && nf < MaxFunctionEvaluations
-            for i = 1:numel(factors)
-                if nf >= MaxFunctionEvaluations
-                    break;
-                end
-                xnew = xbase + factors(i) * pattern_step * momentum_direction;
-                if ~isempty(failed_pattern_point) && isequal(xnew, failed_pattern_point)
-                    break;
-                end
-                [fnew, fnew_real, is_valid] = eval_fun(fun, xnew);
-                nf = nf + 1;
-                fhist(nf) = fnew_real;
-                if output_xhist
-                    xhist(:, nf) = xnew;
-                    if ~is_valid
-                        invalid_points = [invalid_points, xnew];
-                    end
-                end
-                if fnew < fbest
-                    xbest = xnew;
-                    fbest = fnew;
-                    best_direction = momentum_direction;
-                else
-                    break;
-                end
-                if fnew <= ftarget
-                    target_reached = true;
-                    break;
-                end
-            end
-        end
-
-        if fbest < fbase
-            post_poll_acceleration_succeeded = true;
-            xbase = xbest;
-            fbase = fbest;
-            if options.use_productive_direction_memory && ~isempty(best_direction)
-                productive_direction_memory = remember_accelerated_bds_direction( ...
-                    productive_direction_memory, best_direction, pattern_step, ...
-                    productive_direction_memory_size);
-            end
-        end
-        if target_reached
-            terminate = true;
-            exitflag = get_exitflag("FTARGET_REACHED");
-        end
+        [xbase, fbase, nf, fhist, xhist, invalid_points, ...
+            target_reached, terminate, exitflag, momentum, ...
+            productive_direction_memory, post_poll_acceleration_succeeded] = ...
+            run_post_poll_acceleration_phase( ...
+            fun, xbase, fbase, iteration_step, iteration_step_norm, ...
+            momentum, momentum_decay, productive_direction_memory, ...
+            productive_direction_memory_size, alpha_tol, ...
+            options.use_iteration_pattern_step, options.use_momentum_extrapolation, ...
+            options.use_productive_direction_memory, ...
+            nf, MaxFunctionEvaluations, ftarget, fhist, xhist, invalid_points, ...
+            output_xhist, target_reached, terminate, exitflag);
     end
 
     if fbase < fopt
