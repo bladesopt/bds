@@ -23,9 +23,9 @@ function [state, result] = run_productive_direction_memory_phase(fun, state, con
 %   terminate/exitflag update.
 %
 %   The phase preserves the memory list order, candidate acceptance and
-%   target checks, history and invalid-point recording, evaluation budget
-%   handling, and termination/exitflag precedence of the original inline
-%   block.
+%   target checks, history and invalid-point recording, and evaluation-budget
+%   handling of the original inline block. The caller applies the resulting
+%   target_reached flag to update termination and exitflag.
 
 result = struct('succeeded', false, 'target_reached', false);
 

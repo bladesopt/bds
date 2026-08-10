@@ -34,9 +34,9 @@ function [state, result] = run_post_poll_acceleration_phase(fun, state, config, 
 %   records whether the phase evaluated a point with f <= ftarget; the
 %   caller owns the corresponding terminate/exitflag update.
 %
-%   The phase preserves the target checks, evaluation accounting,
-%   histories, and termination/exitflag handling of the original inline
-%   block.
+%   The phase preserves target detection, evaluation accounting, and histories
+%   of the original inline block. The caller applies the resulting
+%   target_reached flag to update termination and exitflag.
 
 result = struct('succeeded', false, 'target_reached', false);
 

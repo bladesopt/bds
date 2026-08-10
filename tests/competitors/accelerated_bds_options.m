@@ -695,13 +695,11 @@ fopt = f0;
 fopt_window = [fopt_window(2:end), fopt];
 
 terminate = false;
-target_reached = false;
 % Check whether ftarget or MaxFunctionEvaluations is reached immediately after every function
 % evaluation. If one of them is reached at x0, no further computation should be entertained,
 % and hence, we will not run any iteration by setting maxit to 0.
 if f0_real <= ftarget
     maxit = 0;
-    target_reached = true;
     terminate = true;
     exitflag = get_exitflag("FTARGET_REACHED");
 elseif nf >= MaxFunctionEvaluations
@@ -757,7 +755,6 @@ for iter = 1:maxit
     productive_direction_memory = accel_state.productive_direction_memory;
     pre_poll_memory_succeeded = pre_poll_result.succeeded;
     if pre_poll_result.target_reached
-        target_reached = true;
         terminate = true;
         exitflag = get_exitflag("FTARGET_REACHED");
     end
@@ -833,15 +830,16 @@ for iter = 1:maxit
         grad_info.fbase_per_batch(i) = fbase;
 
         % Set the options for the direct search within the i_real-th block.
-        suboptions.FunctionEvaluations_exhausted = nf;
-        suboptions.MaxFunctionEvaluations = MaxFunctionEvaluations - nf;
-        suboptions.ftarget = ftarget;
-        suboptions.forcing_function = forcing_function;
-        suboptions.reduction_factor = reduction_factor;
-        suboptions.polling_inner = polling_inner;
-        suboptions.cycling_inner = cycling_inner;
-        suboptions.iprint = iprint;
-        suboptions.i_real = i_real;
+        suboptions = struct( ...
+            'FunctionEvaluations_exhausted', nf, ...
+            'MaxFunctionEvaluations', MaxFunctionEvaluations - nf, ...
+            'ftarget', ftarget, ...
+            'forcing_function', forcing_function, ...
+            'reduction_factor', reduction_factor, ...
+            'polling_inner', polling_inner, ...
+            'cycling_inner', cycling_inner, ...
+            'iprint', iprint, ...
+            'i_real', i_real);
 
         % Perform the direct search within the i_real-th block.
         [sub_xopt, sub_fopt, sub_exitflag, sub_output] = inner_direct_search(fun, xbase,...
@@ -993,6 +991,9 @@ for iter = 1:maxit
         end
     end
 
+    % Summarize the net displacement and objective decrease accumulated since the beginning
+    % of the current iteration. The post-poll acceleration phase uses the displacement norm
+    % to decide whether the iteration step is large enough for pattern or momentum search.
     iteration_step = xbase - xbase_iteration_start;
     iteration_step_norm = norm(iteration_step);
     if fbase < fbase_iteration_start
@@ -1002,7 +1003,7 @@ for iter = 1:maxit
     % Post-poll acceleration phase: try a pattern step, then momentum if needed.
     % The entry guard stays here to keep the phase ordering visible; accel_state
     % packs exactly the mutable state the phase may update.
-    if ~terminate && iteration_improved && iteration_step_norm > max(alpha_tol) ...
+    if ~terminate && iteration_improved && iteration_step_norm > accel_config.step_floor ...
             && nf < MaxFunctionEvaluations ...
             && (options.use_iteration_pattern_step || options.use_momentum_extrapolation)
         accel_state = struct( ...
@@ -1019,7 +1020,6 @@ for iter = 1:maxit
         momentum = accel_state.momentum;
         post_poll_acceleration_succeeded = post_poll_result.succeeded;
         if post_poll_result.target_reached
-            target_reached = true;
             terminate = true;
             exitflag = get_exitflag("FTARGET_REACHED");
         end
@@ -1090,30 +1090,56 @@ for iter = 1:maxit
                                                     direction_selection_probability_matrix, ...
                                                     lipschitz_constant);
 
-                % Record a scale reference only when two estimates at the same
-                % xbase are consistent. The estimates use the ordinary polling
-                % points, so this check does not require new function evaluations.
+                % The following three variables are diagnostic snapshots only. They preserve
+                % the reference-scale and gradient-window state before processing the current
+                % gradient estimate. They do not participate in reference initialization, window
+                % updates, threshold construction, or the gradient stopping decision.
                 reference_initialized_before_iteration = record_gradient_norm;
                 reference_grad_norm_before = nan;
                 if reference_initialized_before_iteration
                     reference_grad_norm_before = reference_grad_norm;
                 end
                 norm_grad_window_before = norm_grad_window;
+
+                % Core gradient-stopping logic: decide whether the current estimated gradient
+                % can be used to initialize reference_grad_norm. A gradient estimate is generated
+                % in an iteration only when ordinary polling provides complete directional
+                % information without sufficient decrease and no post-poll acceleration is
+                % accepted.
+
+                % In the core algorithm, the consistency test has exactly one purpose: deciding
+                % whether reference_grad_norm may be initialized. Gradient estimates added to
+                % norm_grad_window after initialization do not undergo the consistency test.
+                % When use_gradient_reference_consistency is false, the current estimate becomes
+                % a reference candidate without comparison with an earlier estimate. When the
+                % option is true, the most recent available estimate must exist, both estimates
+                % must be computed at the same xbase, and their consistency ratio is computed as
+                %     norm(grad - previous_gradient) /
+                %         max(1, norm(grad), norm(previous_gradient)).
+                % The ratio must not exceed grad_reference_raw_tol. The estimate stored in
+                % previous_gradient need not come from the immediately preceding outer iteration.
+                % Passing the consistency test is necessary but not sufficient for initialization.
+                % The gradient error test below must also pass. After reference_grad_norm has been
+                % initialized, the comparison is performed only when diagnostics are requested.
                 reference_same_point = false;
                 reference_consistency_ratio = nan;
-                reference_candidate_reliable = ...
-                    ~options.use_gradient_reference_consistency;
-                if ~isempty(previous_gradient)
-                    reference_same_point = isequal(xbase, previous_gradient_x);
-                    reference_consistency_ratio = norm(grad - previous_gradient) / ...
-                        max([1, norm(grad), norm(previous_gradient)]);
-                    if options.use_gradient_reference_consistency
-                        reference_candidate_reliable = reference_same_point ...
-                            && reference_consistency_ratio ...
-                                <= options.grad_reference_raw_tol;
+                reference_candidate_reliable = ~options.use_gradient_reference_consistency;
+                if ~record_gradient_norm || output_gradient_stop_diagnostics
+                    if ~isempty(previous_gradient)
+                        reference_same_point = isequal(xbase, previous_gradient_x);
+                        reference_consistency_ratio = norm(grad - previous_gradient) / ...
+                            max([1, norm(grad), norm(previous_gradient)]);
+                        if options.use_gradient_reference_consistency
+                            reference_candidate_reliable = reference_same_point ...
+                                && reference_consistency_ratio ...
+                                    <= options.grad_reference_raw_tol;
+                        end
                     end
                 end
 
+                % Core gradient-stopping state update. Before initialization, a reliable estimate
+                % establishes the fixed reference scale. After initialization, each estimate is
+                % appended to the sliding window as a conservative norm upper bound.
                 if ~record_gradient_norm
                     if reference_candidate_reliable ...
                             && grad_error < max(1e-3, 1e-1 * norm(grad))
@@ -1124,6 +1150,9 @@ for iter = 1:maxit
                     norm_grad_window = [norm_grad_window(2:end), norm(grad) + grad_error];
                 end
 
+                % The post-update reference norm below is a diagnostic snapshot. The threshold
+                % values that follow are core gradient-stopping quantities and are available only
+                % after the reference scale has been initialized.
                 reference_grad_norm_after = nan;
                 threshold_relative = nan;
                 threshold_absolute_fallback = nan;
@@ -1134,8 +1163,8 @@ for iter = 1:maxit
                         * max(1, reference_grad_norm);
                 end
 
-                % Check whether each value in the window satisfies at least one
-                % of the relative and absolute thresholds.
+                % Core gradient-stopping decision. Every value in the window must satisfy at
+                % least one of the relative and absolute thresholds.
                 gradient_criterion_satisfied = record_gradient_norm ...
                     && all((norm_grad_window < threshold_relative) ...
                         | (norm_grad_window < threshold_absolute_fallback));
