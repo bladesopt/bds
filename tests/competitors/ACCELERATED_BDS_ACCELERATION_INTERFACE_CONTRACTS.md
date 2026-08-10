@@ -42,7 +42,7 @@ appropriate layer).
 | `terminate` | termination state | never read; incoming provably `false` | yes (only together with `target_reached`) | polling-loop guard, post-poll guard, loop exit | phase result | keep as pure result |
 | `exitflag` | termination state | never read | yes (only `FTARGET_REACHED`, only together with `target_reached`) | output message | phase result | keep as pure result |
 | `iteration_improved` | iteration flag | no | yes (set true on acceptance) | none before caller re-derives it | redundant | **drop** (see below) |
-| `pre_poll_memory_succeeded` (output) | — | — | yes | gradient-stop diagnostics | phase result | keep (result) |
+| `pre_poll_memory_succeeded` (output) | — | — | yes | none remaining | phase result | later dropped (no remaining reader) |
 
 Proof obligations for the two non-obvious rows:
 
@@ -88,7 +88,7 @@ Proof obligations for the two non-obvious rows:
 | `target_reached` | termination state | only as own search state; incoming provably `false` (entry guard requires `~terminate`, and `target_reached` implies `terminate`) | yes | caller termination handling | phase result | keep as pure result |
 | `terminate` | termination state | never read | yes (only together with `target_reached`) | loop exit, stopping checks | phase result | keep as pure result |
 | `exitflag` | termination state | never read | yes (only `FTARGET_REACHED`, only together with `target_reached`) | output message | phase result | keep as pure result |
-| `post_poll_acceleration_succeeded` (output) | — | — | yes | objective-change stop guard, gradient-estimation guard, diagnostics | phase result | keep (result) |
+| `post_poll_acceleration_succeeded` (output) | — | — | yes | objective-change stop guard, gradient-estimation guard | phase result | keep (result) |
 
 The entry guard (`~terminate && iteration_improved && iteration_step_norm >
 max(alpha_tol) && nf < MaxFunctionEvaluations && (use_iteration_pattern_step
@@ -156,8 +156,11 @@ that state is provably `false`/unset at every call site (see audit).
 
 | Field | Meaning |
 |---|---|
-| `succeeded` | `pre_poll_memory_succeeded` / `post_poll_acceleration_succeeded` |
+| `succeeded` | post-poll only: `post_poll_acceleration_succeeded` (an acceleration candidate was accepted) |
 | `target_reached` | the phase evaluated a point with `fnew <= ftarget` |
+
+The pre-poll result carries only `target_reached`; whether a retained
+direction was accepted is already visible in the updated base point.
 
 The caller applies the termination update explicitly and identically after
 each call, preserving the termination/exitflag precedence of the original
@@ -165,7 +168,6 @@ code:
 
 ```matlab
 if result.target_reached
-    target_reached = true;
     terminate = true;
     exitflag = get_exitflag("FTARGET_REACHED");
 end
@@ -173,7 +175,7 @@ end
 
 `exitflag` no longer passes through the helpers at all: they only ever wrote
 `FTARGET_REACHED` (never read the incoming value), so ownership of the
-termination triple stays visibly in the main solver.
+termination update stays visibly in the main solver.
 
 ### Why this is simpler than the positional interface
 
@@ -195,8 +197,7 @@ termination triple stays visibly in the main solver.
 Pre-poll: memory list order; trial step `max(alpha_average, stored_step)`;
 candidate evaluation order; acceptance comparison; target checks; at most
 two extrapolation evaluations; memory reordering; `nf`/`fhist`/`xhist`/
-`invalid_points` bookkeeping; `pre_poll_memory_succeeded`; termination and
-exitflag precedence.
+`invalid_points` bookkeeping; termination and exitflag precedence.
 
 Post-poll: entry-guard timing and location; pattern direction/step;
 momentum update, decay and normalization order; factors `[1, 2, 4]`; pattern
@@ -228,8 +229,12 @@ All runs on this machine via
 - Stage 5 step 4 (premature initializations): no change required —
   `post_poll_acceleration_succeeded = false` and `iteration_improved = false`
   at the top of the iteration body are still needed (the post-poll guard may
-  skip the phase, and the polling path/diagnostics consume the flags);
-  `pre_poll_memory_succeeded` has no redundant initialization.
+  skip the phase, and the polling path consumes the flags).
+- Follow-up cleanup: `pre_poll_memory_succeeded` and
+  `regular_poll_succeeded` had no remaining reader and were deleted; the
+  pre-poll `result.succeeded` field was removed with them; the
+  reference-consistency test was rewritten without snapshot variables.
+  accel passed, gradstop passed.
 - Stage 6 (helper headers and call-site comments): accel passed, gradstop
   passed.
 - Stage 7 final acceptance: accel passed, gradstop passed,

@@ -402,13 +402,6 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %   output_grad_hist                      Whether to output estimated gradients and the
 %                                         corresponding points.
 %                                         Default: false.
-%   output_gradient_stop_diagnostics      Whether to output a detailed trace of the estimated-
-%                                         gradient stopping test. The trace records gradient
-%                                         estimates, error bounds, reference-scale updates,
-%                                         stopping thresholds, and the resulting stopping decisions.
-%                                         Enabling this option does not change the stopping
-%                                         criterion or add function evaluations.
-%                                         Default: false.
 %   iprint                                A flag deciding how much information will be printed
 %                                         during the computation. It can be 0, 1, 2, or 3.
 %                                         0: no information is printed.
@@ -448,8 +441,6 @@ function [xopt, fopt, exitflag, output] = accelerated_bds_options(fun, x0, optio
 %   grad_hist                   History of estimated gradients if output_grad_hist is true.
 %   grad_xhist                  History of points where estimated gradients are computed if
 %                               output_grad_hist is true.
-%   gradient_stop_diagnostics   Detailed trace of estimated-gradient stopping checks if
-%                               output_gradient_stop_diagnostics is true.
 %   xhist                       History of points visited if output_xhist is true.
 %   invalid_points              History of points where function evaluation fails if
 %                               output_xhist is true.
@@ -607,7 +598,6 @@ output_block_hist = options.output_block_hist;
 block_hist = nan(1, MaxFunctionEvaluations);
 
 output_grad_hist = options.output_grad_hist;
-output_gradient_stop_diagnostics = options.output_gradient_stop_diagnostics;
 
 iprint = options.iprint;
 
@@ -625,22 +615,6 @@ grad_info.step_size_per_batch = nan(batch_size, 1);
 grad_info.step_size_per_block = alpha_all;
 grad_info.fbase_per_batch = nan(batch_size, 1);
 grad_info.complete_direction_set = D;
-gradient_stop_diagnostics = struct( ...
-    'evaluation_count', {}, 'iteration', {}, 'xbase', {}, 'fbase', {}, ...
-    'fopt', {}, 'estimated_gradient', {}, 'estimated_gradient_norm', {}, ...
-    'gradient_error_bound', {}, 'gradient_step_sizes', {}, 'next_step_sizes', {}, ...
-    'sampled_direction_indices_per_batch', {}, 'function_values_per_batch', {}, ...
-    'sampled_points_per_batch', {}, 'fbase_per_batch', {}, ...
-    'reference_gradient_norm_before', {}, 'reference_gradient_norm_after', {}, ...
-    'norm_gradient_window_before', {}, 'norm_gradient_window_after', {}, ...
-    'threshold_relative', {}, 'threshold_absolute_fallback', {}, ...
-    'reference_initialized', {}, 'reference_same_point', {}, ...
-    'reference_consistency_ratio', {}, 'reference_candidate_reliable', {}, ...
-    'window_ready', {}, ...
-    'criterion_satisfied', {}, ...
-    'stop_decision', {}, ...
-    'pre_poll_memory_succeeded', {}, 'regular_poll_succeeded', {}, ...
-    'post_poll_acceleration_succeeded', {}, 'iteration_improved', {});
 
 % Initialize exitflag with the default termination status.
 % If no other termination condition overrides it, completing maxit iterations
@@ -733,11 +707,9 @@ for iter = 1:maxit
 
     % Initialize flags that record accepted improvement during the iteration.
     % iteration_improved summarizes the net decrease in fbase from the iteration
-    % start. The phase-specific flags record accepted updates from regular polling
-    % and post-poll acceleration, respectively, using each phase's own acceptance
-    % rule.
+    % start. post_poll_acceleration_succeeded records an accepted post-poll
+    % acceleration update using that phase's own acceptance rule.
     iteration_improved = false;
-    regular_poll_succeeded = false;
     post_poll_acceleration_succeeded = false;
 
     % Pre-poll phase: try the productive directions retained from previous iterations.
@@ -753,7 +725,6 @@ for iter = 1:maxit
     nf = accel_state.nf; fhist = accel_state.fhist;
     xhist = accel_state.xhist; invalid_points = accel_state.invalid_points;
     productive_direction_memory = accel_state.productive_direction_memory;
-    pre_poll_memory_succeeded = pre_poll_result.succeeded;
     if pre_poll_result.target_reached
         terminate = true;
         exitflag = get_exitflag("FTARGET_REACHED");
@@ -937,7 +908,6 @@ for iter = 1:maxit
         if ~strcmpi(block_visiting_pattern, "parallel") && update_base
             xbase = sub_xopt;
             fbase = sub_fopt;
-            regular_poll_succeeded = true;
 
             % The regular-polling update for this block is complete. Record the accepted
             % block displacement as one entry in the productive-direction memory. The memory
@@ -987,7 +957,6 @@ for iter = 1:maxit
             forcing_function(min(alpha_all)) < fbase
             xbase = xopt;
             fbase = fopt;
-            regular_poll_succeeded = true;
         end
     end
 
@@ -1073,7 +1042,7 @@ for iter = 1:maxit
             % occurs in the current iteration iter.
             grad_iter = [grad_iter, iter];
 
-            if use_estimated_gradient_stop || output_gradient_stop_diagnostics
+            if use_estimated_gradient_stop
 
                 % Compute the gradient error bound.
                 % Note that we use grad_info.step_size_per_block (not step_size_per_batch) and
@@ -1089,17 +1058,6 @@ for iter = 1:maxit
                                                     positive_direction_set, ...
                                                     direction_selection_probability_matrix, ...
                                                     lipschitz_constant);
-
-                % The following three variables are diagnostic snapshots only. They preserve
-                % the reference-scale and gradient-window state before processing the current
-                % gradient estimate. They do not participate in reference initialization, window
-                % updates, threshold construction, or the gradient stopping decision.
-                reference_initialized_before_iteration = record_gradient_norm;
-                reference_grad_norm_before = nan;
-                if reference_initialized_before_iteration
-                    reference_grad_norm_before = reference_grad_norm;
-                end
-                norm_grad_window_before = norm_grad_window;
 
                 % Core gradient-stopping logic: decide whether the current estimated gradient
                 % can be used to initialize reference_grad_norm. A gradient estimate is generated
@@ -1119,22 +1077,15 @@ for iter = 1:maxit
                 % The ratio must not exceed grad_reference_raw_tol. The estimate stored in
                 % previous_gradient need not come from the immediately preceding outer iteration.
                 % Passing the consistency test is necessary but not sufficient for initialization.
-                % The gradient error test below must also pass. After reference_grad_norm has been
-                % initialized, the comparison is performed only when diagnostics are requested.
-                reference_same_point = false;
-                reference_consistency_ratio = nan;
+                % The gradient error test below must also pass. Once reference_grad_norm has
+                % been initialized, the consistency test is no longer needed and is not computed.
                 reference_candidate_reliable = ~options.use_gradient_reference_consistency;
-                if ~record_gradient_norm || output_gradient_stop_diagnostics
-                    if ~isempty(previous_gradient)
-                        reference_same_point = isequal(xbase, previous_gradient_x);
-                        reference_consistency_ratio = norm(grad - previous_gradient) / ...
-                            max([1, norm(grad), norm(previous_gradient)]);
-                        if options.use_gradient_reference_consistency
-                            reference_candidate_reliable = reference_same_point ...
-                                && reference_consistency_ratio ...
-                                    <= options.grad_reference_raw_tol;
-                        end
-                    end
+                if ~record_gradient_norm && options.use_gradient_reference_consistency
+                    reference_candidate_reliable = ~isempty(previous_gradient) ...
+                        && isequal(xbase, previous_gradient_x) ...
+                        && norm(grad - previous_gradient) / ...
+                            max([1, norm(grad), norm(previous_gradient)]) ...
+                            <= options.grad_reference_raw_tol;
                 end
 
                 % Core gradient-stopping state update. Before initialization, a reliable estimate
@@ -1150,14 +1101,11 @@ for iter = 1:maxit
                     norm_grad_window = [norm_grad_window(2:end), norm(grad) + grad_error];
                 end
 
-                % The post-update reference norm below is a diagnostic snapshot. The threshold
-                % values that follow are core gradient-stopping quantities and are available only
-                % after the reference scale has been initialized.
-                reference_grad_norm_after = nan;
+                % The stopping thresholds are available only after the reference scale has
+                % been initialized.
                 threshold_relative = nan;
                 threshold_absolute_fallback = nan;
                 if record_gradient_norm
-                    reference_grad_norm_after = reference_grad_norm;
                     threshold_relative = grad_tol * min(1, reference_grad_norm);
                     threshold_absolute_fallback = options.grad_reference_relative_tol ...
                         * max(1, reference_grad_norm);
@@ -1169,49 +1117,9 @@ for iter = 1:maxit
                     && all((norm_grad_window < threshold_relative) ...
                         | (norm_grad_window < threshold_absolute_fallback));
 
-                gradient_stop_decision = use_estimated_gradient_stop ...
-                    && gradient_criterion_satisfied;
-                if gradient_stop_decision
+                if gradient_criterion_satisfied
                     terminate = true;
                     exitflag = get_exitflag("SMALL_ESTIMATE_GRADIENT");
-                end
-
-                if output_gradient_stop_diagnostics
-                    trace_index = numel(gradient_stop_diagnostics) + 1;
-                    gradient_stop_diagnostics(trace_index) = struct( ...
-                        'evaluation_count', nf, ...
-                        'iteration', iter, ...
-                        'xbase', xbase, ...
-                        'fbase', fbase, ...
-                        'fopt', fopt, ...
-                        'estimated_gradient', grad, ...
-                        'estimated_gradient_norm', norm(grad), ...
-                        'gradient_error_bound', grad_error, ...
-                        'gradient_step_sizes', grad_info.step_size_per_block, ...
-                        'next_step_sizes', alpha_all, ...
-                        'sampled_direction_indices_per_batch', ...
-                            {sampled_direction_indices_per_batch}, ...
-                        'function_values_per_batch', {function_values_per_batch}, ...
-                        'sampled_points_per_batch', {sampled_points_per_batch}, ...
-                        'fbase_per_batch', grad_info.fbase_per_batch, ...
-                        'reference_gradient_norm_before', reference_grad_norm_before, ...
-                        'reference_gradient_norm_after', reference_grad_norm_after, ...
-                        'norm_gradient_window_before', norm_grad_window_before, ...
-                        'norm_gradient_window_after', norm_grad_window, ...
-                        'threshold_relative', threshold_relative, ...
-                        'threshold_absolute_fallback', threshold_absolute_fallback, ...
-                        'reference_initialized', ...
-                            ~reference_initialized_before_iteration && record_gradient_norm, ...
-                        'reference_same_point', reference_same_point, ...
-                        'reference_consistency_ratio', reference_consistency_ratio, ...
-                        'reference_candidate_reliable', reference_candidate_reliable, ...
-                        'window_ready', all(~isnan(norm_grad_window)), ...
-                        'criterion_satisfied', gradient_criterion_satisfied, ...
-                        'stop_decision', gradient_stop_decision, ...
-                        'pre_poll_memory_succeeded', pre_poll_memory_succeeded, ...
-                        'regular_poll_succeeded', regular_poll_succeeded, ...
-                        'post_poll_acceleration_succeeded', post_poll_acceleration_succeeded, ...
-                        'iteration_improved', iteration_improved);
                 end
 
                 previous_gradient = grad;
@@ -1254,9 +1162,6 @@ if output_grad_hist
     output.grad_hist = grad_hist;
     output.grad_xhist = grad_xhist;
     output.grad_iter = grad_iter;
-end
-if output_gradient_stop_diagnostics
-    output.gradient_stop_diagnostics = gradient_stop_diagnostics;
 end
 
 output.fhist = fhist(1:nf);

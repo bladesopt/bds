@@ -64,8 +64,6 @@ switch constant_name
         constant_value = false;
     case "output_grad_hist"
         constant_value = false;
-    case "output_gradient_stop_diagnostics"
-        constant_value = false;
     case "iprint"
         constant_value = 0;
     case "debug_flag"

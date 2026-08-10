@@ -136,9 +136,9 @@ plotting，也没有重跑 solver。`200N` 使用每个 problem 的 `200*N` hist
 
 - `verify_bds_acceleration`：acceleration off 与 `bds.m` 在五种 Algorithms 下一致；
   acceleration on 与 `lean_evolved_bds.m` 一致；
-- `verify_gradient_stop_no_extra_evaluations`：objective-call counter 验证 diagnostics
-  不改变 trajectory，所有 calls 与 `funcCount/xhist` 一一对应，并确实由 final
-  pure-gradient criterion 退出；
+- `verify_gradient_stop_no_extra_evaluations`：objective-call counter 验证所有 calls 与
+  `funcCount/xhist` 一一对应，explicit final options 与 solver defaults 行为相同，
+  并确实由 final pure-gradient criterion 退出；
 - final four-way marker：`GRADIENT_STOP_FINAL_COMPARISON_OK`，exit code `0`；
 - no-extra-evaluation marker：`GRADIENT_STOP_NO_EXTRA_EVALUATIONS_OK`。
 

@@ -9,8 +9,7 @@ This checklist records the cleanup needed for `accelerated_bds_options.m` to rea
   `src/bds.m` under the existing `verify_bds_acceleration` gate.
 - [x] With all acceleration switches enabled, the default and `Algorithm='cbds'` paths are
   equivalent to `lean_evolved_bds.m` under the existing gate.
-- [x] Gradient-stop diagnostics and the theta-aware reliability gate do not add function
-  evaluations.
+- [x] The estimated-gradient stopping gate does not add function evaluations.
 - [x] Public option names, defaults, exit flags, output fields, and evaluation order remain
   unchanged.
 
@@ -29,8 +28,7 @@ This checklist records the cleanup needed for `accelerated_bds_options.m` to rea
   `bds.m` (`productive_direction_memory`, `direction`, `xnew`, `fnew`,
   `iteration_step`, `pattern_direction`, `pattern_step`).
 - [x] Keep the gradient-reference algorithm in the main loop but reduce its comments to the
-  same density as the surrounding BDS code; use descriptive before/after state names for the
-  optional diagnostic output.
+  same density as the surrounding BDS code.
 - [x] Restore the author footer and the small formatting details shared with `bds.m`.
 - [x] Align `set_accelerated_bds_options.m` with the explanatory style and option-ordering
   vocabulary of `set_options.m`, while retaining its stricter normalization helpers and the

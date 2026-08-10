@@ -72,7 +72,7 @@ logical implementation step. Warnings from test problems do not count as
 failures. Any MATLAB error or `iseqiv` failure blocks the next step.
 
 Focused regression checks should also be run whenever a step touches gradient
-diagnostic plumbing or objective-evaluation bookkeeping:
+stopping bookkeeping or objective-evaluation bookkeeping:
 
 ```matlab
 addpath(genpath(pwd));
@@ -91,10 +91,7 @@ output descriptions remain useful. Some local implementation comments may
 move with the code into private helpers and should be reviewed after the
 refactor rather than rewritten in parallel with it.
 
-The plan does not introduce diagnostics for every mechanism and does not
-redesign `gradient_stop_diagnostics`. That separate architectural question is
-recorded in `ACCELERATED_BDS_DIAGNOSTICS_DESIGN.md` and is revisited only after
-the solver structure has been understood.
+The plan does not introduce diagnostics for any mechanism.
 
 ## Stage 0: Baseline and working-tree inventory
 
@@ -104,8 +101,7 @@ Before editing implementation code:
 2. Read the complete current iteration body and all private helpers called by
    the acceleration phases.
 3. Run `verify_bds_acceleration` and record that both strict suites pass.
-4. Run `verify_gradient_stop_no_extra_evaluations` if the current branch
-   contains the diagnostics option.
+4. Run `verify_gradient_stop_no_extra_evaluations`.
 5. Identify every variable read or written by each acceleration phase,
    including histories, function-evaluation counters, termination flags,
    momentum state, and productive-direction memory.
@@ -178,7 +174,7 @@ After the extraction:
 
 1. Compare the old and new block mechanically where practical.
 2. Run `verify_bds_acceleration`.
-3. Run the focused gradient diagnostic check if bookkeeping was touched.
+3. Run the focused gradient-stop accounting check if bookkeeping was touched.
 4. Inspect the diff for accidental comment-only or formatting changes outside
    the extracted block.
 
@@ -201,8 +197,6 @@ After the extraction, run:
 1. `verify_bds_acceleration` for both strict targets;
 2. `verify_gradient_stop_no_extra_evaluations`;
 3. any focused acceleration tests already present in the repository;
-4. a review of diagnostic records to ensure phase-success fields retain their
-   original values and timing.
 
 Acceptance gate: no evaluation sequence, returned history, stopping decision,
 or random behaviour changes.
@@ -234,7 +228,6 @@ After the behaviour-preserving extraction is complete:
 - remove local comments that merely restate moved code;
 - move mechanism-specific explanations next to the corresponding helper;
 - keep the main solver comments focused on phase ordering and shared state;
-- update the diagnostics design note if the refactor changes its conclusions;
 - defer another broad prose pass until the code structure is stable.
 
 Run both strict suites one final time after comment and formatting changes as a

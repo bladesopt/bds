@@ -17,8 +17,7 @@ function [state, result] = run_productive_direction_memory_phase(fun, state, con
 %   solver/evaluation state the phase may update: xbase, fbase, nf, fhist,
 %   xhist, invalid_points, and productive_direction_memory. alpha_average is
 %   the mean of the current per-block step sizes, precomputed by the caller.
-%   result is the phase result: succeeded records whether a retained
-%   direction was accepted, and target_reached records whether the phase
+%   result is the phase result: target_reached records whether the phase
 %   evaluated a point with f <= ftarget; the caller owns the corresponding
 %   terminate/exitflag update.
 %
@@ -27,7 +26,7 @@ function [state, result] = run_productive_direction_memory_phase(fun, state, con
 %   handling of the original inline block. The caller applies the resulting
 %   target_reached flag to update termination and exitflag.
 
-result = struct('succeeded', false, 'target_reached', false);
+result = struct('target_reached', false);
 
 % Try the productive directions recorded from successful polling steps.
 if config.use_productive_direction_memory && ...
@@ -54,7 +53,6 @@ if config.use_productive_direction_memory && ...
         if fnew < state.fbase
             state.xbase = xnew;
             state.fbase = fnew;
-            result.succeeded = true;
             if result.target_reached
                 break;
             end

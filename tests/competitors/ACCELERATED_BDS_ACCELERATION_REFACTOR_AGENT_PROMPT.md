@@ -30,7 +30,7 @@
 禁止修改：
 
 - solver iteration 开始之前的任何注释。该区域的注释已经由开发者修订，必须原样保留；
-- 函数头注释，包括 options、termination、output 和 diagnostics 的已有修订；
+- 函数头注释，包括 options、termination 和 output 的已有修订；
 - 任何不涉及加速机制的注释；
 - 普通 BDS polling 算法及其相关代码；
 - 梯度估计、梯度停机和 objective-window 逻辑；
@@ -64,7 +64,7 @@ use_momentum_extrapolation = false
 
 此时 `accelerated_bds_options.m` 必须与 `bds.m` 在相同显式 solver options 下完全一致。
 
-完全一致包括函数评估点序列、函数评估次数、返回点和目标函数值、stopping behavior、exitflag、histories、diagnostics 和 random behavior。
+完全一致包括函数评估点序列、函数评估次数、返回点和目标函数值、stopping behavior、exitflag、histories 和 random behavior。
 
 ## MATLAB 执行方式
 
@@ -77,7 +77,7 @@ cd /Users/lihaitian/Work/bds
 matlab -batch "addpath(genpath(pwd)); verify_bds_acceleration"
 ```
 
-如果涉及函数评估 bookkeeping 或 gradient diagnostics，再运行：
+如果涉及函数评估 bookkeeping 或 gradient stopping，再运行：
 
 ```bash
 matlab -batch "addpath(genpath(pwd)); verify_gradient_stop_no_extra_evaluations"
@@ -106,7 +106,7 @@ tail -n 40 /tmp/bds_verify_acceleration.log
 1. 检查 `git status` 和现有 diff，保护所有用户已有修改。
 2. 阅读当前 iteration body 以及所有 acceleration private helpers。
 3. 运行并记录 `verify_bds_acceleration` 基线结果。
-4. 如当前分支包含 diagnostics option，运行 `verify_gradient_stop_no_extra_evaluations`。
+4. 运行 `verify_gradient_stop_no_extra_evaluations`。
 5. 列出三个加速阶段读取和写入的全部状态。
 
 只有基线严格检查通过，才能继续。

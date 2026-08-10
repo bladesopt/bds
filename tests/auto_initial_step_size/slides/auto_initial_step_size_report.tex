@@ -90,7 +90,7 @@ exact zero coordinate 保留 neutral unit step。
   \item function-only：\texttt{window=20}, \texttt{tol=1e-6}
   \item gradient-only：\texttt{window=1}, \texttt{tol=1e-6}, $\rho=10^{-2}$
   \item 两者取 OR，但只有本轮 post-poll acceleration 失败才允许停机
-  \item gradient diagnostics 复用 polling values，\good{不增加 function evaluations}
+  \item gradient-only stop 复用 polling values，\good{不增加 function evaluations}
 \end{itemize}
 \end{block}
 \end{columns}

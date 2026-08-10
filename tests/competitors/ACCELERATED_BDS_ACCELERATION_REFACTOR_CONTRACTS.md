@@ -105,7 +105,7 @@ history, termination and exitflag updates of the moved block.
 
 `iteration_step`, `iteration_step_norm`, and `iteration_improved` are computed
 in the main iteration body (they consolidate the polling result and feed the
-gradient diagnostics). `xbase_iteration_start`, `fbase_iteration_start`,
+gradient estimation and stopping logic). `xbase_iteration_start`, `fbase_iteration_start`,
 `regular_poll_succeeded`, all ordinary BDS polling state, `fopt`/`xopt`,
 `fopt_window`, the objective-change stop, and the gradient estimation/stop
 logic remain in the main solver.

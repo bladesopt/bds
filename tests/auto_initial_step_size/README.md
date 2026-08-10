@@ -80,9 +80,6 @@ decision record 补充 paired analysis、`c_tau` audit 和 focused regression re
 - `results/cx1_ctau1_vs_unit_*.mat`：两张 direct-comparison 图对应的 curves 和 scores。
 - `stopping/GRADIENT_STOP_INVESTIGATION.md`：pure-gradient failure diagnosis、parameter
   search 和 formal boundary；
-- `stopping/analyze_gradient_no_stop_traces.m`、`stopping/run_gradient_no_stop_trace_collection.m`、
-  `stopping/run_gradient_reference_controlled_search.m` 和
-  `stopping/run_gradient_stop_concrete_diagnostics.m`：支持上述 diagnosis 的可复现脚本；
 - `stopping/final_gradient_profiles/`：no-stop vs final pure-gradient 的 OptiProfiler 原生
   `500N/200N` profiles 与 machine-readable scores；
 - `stopping/*no_stop_function_gradient_combined_500n_optiprofiler.pdf`：no-stop、

@@ -16,11 +16,6 @@ gradient-only stopping strategy。最终 candidate 必须同时满足：
 ## Stage 1: Diagnose concrete failures
 
 - [x] 冻结 `SBRYBND`、`SCURLY20` 与 `POWERSUM` 的 feature、seed、dimension、initial point 和 transformation；controlled runner 使用 OptiProfiler 同一 `real_seed=211`，并把 exact `x0,A,b` 写入机器结果。
-- [x] 为 `accelerated_bds_options.m` 增加显式 diagnostic trace；默认关闭时不得改变 solver behavior。
-- [x] 每次 gradient estimate 记录 evaluation count、iteration、point、estimated gradient、true gradient。
-- [x] 记录构造 estimate 的 sampled points、directions 与 function values；这些全部来自正常 polling，不增加 function evaluation。
-- [x] 记录 `grad_error`、actual estimation error、`reference_grad_norm`、window values 和两个 thresholds。
-- [x] 记录 poll improvement、pre-poll memory success、post-poll pattern/momentum success 和 objective values。
 - [x] 复现 `SBRYBND` 在 `181` evaluations 的错误早停和 `SCURLY20` 的错误早停。
 - [x] 判断主要失败属于 error bound 失真、relative scaling 过宽、非最优 stationary point，还是 acceleration-state mismatch。
 
@@ -48,9 +43,8 @@ gradient-only stopping strategy。最终 candidate 必须同时满足：
 
 ## 不可违反的 evaluation 约束
 
-DFO 的核心成本是 function evaluation。本调查中的 diagnostic 允许读取真实
-gradient 以解释 benchmark 中已经发生的行为，但真实 gradient 只用于离线分析，
-绝不进入 solver。最终 stopping criterion 只能使用 solver 在正常运行中已经拥有的
+DFO 的核心成本是 function evaluation。真实 gradient 只用于离线分析，绝不进入
+solver。最终 stopping criterion 只能使用 solver 在正常运行中已经拥有的
 state、polling points、function values、step sizes 和由它们生成的 gradient estimate。
 任何需要额外 finite difference、重复采样或 confirmation evaluation 的方案均直接淘汰。
 
@@ -93,19 +87,14 @@ norm(g_k-g_{k-1}) / max(1,norm(g_k),norm(g_{k-1})) <= consistency_tol
 controlled search 使用 `consistency_tol={0.01,0.03,0.1,0.3}`、`gw=1`、
 `gt=1e-6`。四个值均消除 `SBRYBND` 和 `SCURLY20` 错停，恢复与 no-stop 相同的
 evaluation counts 和 outputs；也消除了 `plain/POWERSUM` 在 gradient norm 仍约
-`145` 时的提前停机。完整机器结果位于：
-
-```text
-tests/testdata/gradient_stop_concrete_diagnostics_20260726_005442/concrete_diagnostics.mat
-tests/testdata/gradient_reference_controlled_search_20260726_012418/controlled_search.mat
-```
+`145` 时的提前停机。
 
 这只证明 safety mechanism 在已知 cases 上方向正确；是否过度保守以及是否具有
 独立 activation，必须由 full benchmark 决定。
 
 ### 实际 poll points 与 true gradient 对照
 
-diagnostic 保存的是 solver 正常 polling 已经计算过的 points 和 function values；
+调查记录保存的是 solver 正常 polling 已经计算过的 points 和 function values；
 下面的 true gradient 仅在 run 后离线计算。以 reference 初始化和错误 stop 两个时刻
 为例：
 
@@ -125,7 +114,7 @@ stop 时 sampled offsets 已缩小三数量级以上，但 estimate 误差仍比
 保留的 early reference。这两种失败共同说明：既不能信任固定 Hessian Lipschitz
 guess 给出的 error bound，也不能让任意第一个 estimate 定义全程 absolute scale。
 
-## Stage 3 第一轮 full benchmark 与 trace search
+## Stage 3 第一轮 full benchmark 与离线参数搜索
 
 第一轮 full benchmark 使用 `gw={1,2,3,5}`、
 `consistency_tol={0.01,0.03,0.1,0.3}`、`gt=1e-6` 和历史
@@ -136,7 +125,7 @@ guess 给出的 error bound，也不能让任意第一个 estimate 定义全程 
 但历史 reference threshold 过于保守。
 
 为避免为调参反复重跑 solver，随后对两种 feature 的全部 244 个 cases 各运行一次
-no-stop，并保存算法正常 polling 自然产生的 gradient traces。离线 replay 不计算新点、
+no-stop，并记录算法正常 polling 自然产生的 gradient estimates。离线 replay 不计算新点、
 不调用 objective，只改变 stopping decision。粗搜索预测固定 `gw=1`、
 `consistency_tol=0.1` 时：
 
@@ -163,11 +152,6 @@ targets gate。相对 no-stop，`plain` 节省 `1617` 次、
 `linearly_transformed/SBRYBND` 保持 `529` evaluations、
 `linearly_transformed/SCURLY20` 保持 `7173` evaluations，
 `plain/POWERSUM` 保持 `5000` evaluations，均未再次发生原 criterion 的错误早停。
-完整结果位于：
-
-```text
-tests/testdata/gradient_reference_controlled_search_20260726_054009/controlled_search.mat
-```
 
 随后正式 upper-scale validation 检查 `scale=400:100:1000`，所有 candidates 仍在
 两种 feature 的五个 targets 上保持 `122/122`。`scale=1000` 相对 no-stop 在
@@ -242,8 +226,8 @@ combined OR 也通过 formal gate：`plain` 为 `443927 -> 354495`，
 `linearly_transformed` 为 `534414 -> 434060`；它比 function-only 分别额外节省
 `3025` 和 `17191` 次。这证明两个 stopping mechanisms 在最终 strategy 中确实互补。
 
-focused objective-call accounting 还验证了：打开或关闭 diagnostic trace 的 objective-call
-sequence 完全相同，`output.funcCount`、`xhist` 与实际 calls 一一对应，并且 constructed
+focused objective-call accounting 还验证了：`output.funcCount`、`xhist` 与实际 calls
+一一对应，explicit final options 与 solver defaults 行为完全相同，并且 constructed
 case 由 pure-gradient criterion 退出。marker 为：
 
 ```text

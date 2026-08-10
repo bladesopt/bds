@@ -33,7 +33,7 @@ unchanged.
    exactly equivalent to `src/bds.m` for the same algorithm and explicit solver
    options. Equivalence includes the function evaluation sequence and count,
    returned points and objective values, stopping behavior, exit flag, histories,
-   diagnostics, and random behavior.
+   and random behavior.
 2. With all acceleration switches enabled, `accelerated_bds_options.m` must be
    exactly equivalent to `tests/competitors/lean_evolved_bds.m` for the default
    algorithm and for explicit `Algorithm='cbds'`, with the same scope of

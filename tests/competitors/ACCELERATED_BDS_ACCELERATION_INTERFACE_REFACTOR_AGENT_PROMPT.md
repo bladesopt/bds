@@ -52,11 +52,11 @@ matlab -batch "addpath(genpath(pwd)); verify_bds_acceleration"
 
 - 函数评估点序列和次数；
 - stopping behavior 和 exitflag；
-- histories 和 diagnostics；
+- histories；
 - random behavior；
 - 所有返回值和输出字段。
 
-凡是涉及函数评估 bookkeeping、histories、termination state 或 diagnostics 的阶段，还必须运行：
+凡是涉及函数评估 bookkeeping、histories 或 termination state 的阶段，还必须运行：
 
 ```bash
 matlab -batch "addpath(genpath(pwd)); verify_gradient_stop_no_extra_evaluations"
@@ -113,7 +113,7 @@ matlab -batch "addpath(genpath(pwd)); verify_gradient_stop_no_extra_evaluations"
 - `terminate`、`target_reached` 和 `exitflag` 是真正的 input/output state，还是某些 phase 只会产生而不会读取的 result；
 - `iteration_improved` 是 pre-poll phase 的输入输出状态，还是可以更明确地表示为 phase result。
 
-不能只凭“当前函数体没有读取”就删除变量。必须同时审计调用前的不变量、调用后的消费者、diagnostics 和 termination ordering。
+不能只凭“当前函数体没有读取”就删除变量。必须同时审计调用前的不变量、调用后的消费者和 termination ordering。
 
 ### 4. 区分三个层次
 
@@ -234,7 +234,7 @@ tests/competitors/ACCELERATED_BDS_ACCELERATION_INTERFACE_CONTRACTS.md
 - 至多两次 extrapolation evaluations；
 - memory reordering；
 - `nf`、`fhist`、`xhist` 和 `invalid_points`；
-- `iteration_improved` 和 diagnostics phase result；
+- `iteration_improved`；
 - termination 和 exitflag precedence。
 
 实施后立即运行：
@@ -282,7 +282,7 @@ Acceptance gate：两个检查均通过，才可进入下一阶段。
 matlab -batch "addpath(genpath(pwd)); verify_bds_acceleration"
 ```
 
-凡涉及 bookkeeping、termination 或 diagnostics，再运行
+凡涉及 bookkeeping 或 termination，再运行
 `verify_gradient_stop_no_extra_evaluations`。
 
 ### Stage 6：局部注释和调用点整理
