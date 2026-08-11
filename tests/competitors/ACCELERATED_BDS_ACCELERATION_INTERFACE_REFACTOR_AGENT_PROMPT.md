@@ -188,7 +188,6 @@ Acceptance gate：两个检查均通过，且现有用户修改范围已明确�
 - `terminate`；
 - `exitflag`；
 - `iteration_improved`；
-- `pre_poll_memory_succeeded`；
 - `post_poll_acceleration_succeeded`；
 - `iteration_step_norm`；
 - `alpha_tol`；

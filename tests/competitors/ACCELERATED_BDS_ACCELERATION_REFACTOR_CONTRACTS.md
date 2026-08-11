@@ -15,8 +15,8 @@ Current location: `accelerated_bds_options.m`, the block starting at
   `productive_direction_memory`, `nf`, `MaxFunctionEvaluations`, `alpha_all`
   (only `mean(alpha_all)`), `xbase`, `fbase`, `ftarget`, `fun`, `output_xhist`.
 - Writes: `xbase`, `fbase`, `nf`, `fhist`, `xhist`, `invalid_points`,
-  `target_reached`, `terminate`, `exitflag`, `iteration_improved`,
-  `pre_poll_memory_succeeded`, `productive_direction_memory`.
+  `target_reached`, `terminate`, `exitflag`, `iteration_improved`, and
+  `productive_direction_memory`.
 - Calls: `eval_fun`, `try_accelerated_bds_extrapolation`,
   `insert_accelerated_bds_memory_front`, `get_exitflag`.
 
@@ -52,8 +52,8 @@ Current location: `accelerated_bds_options.m`, the block starting at
 ```matlab
 function [xbase, fbase, nf, fhist, xhist, invalid_points, ...
     target_reached, terminate, exitflag, ...
-    iteration_improved, pre_poll_memory_succeeded, ...
-    productive_direction_memory] = run_productive_direction_memory_phase( ...
+    iteration_improved, productive_direction_memory] = ...
+    run_productive_direction_memory_phase( ...
     fun, xbase, fbase, alpha_all, productive_direction_memory, ...
     use_productive_direction_memory, nf, MaxFunctionEvaluations, ftarget, ...
     fhist, xhist, invalid_points, output_xhist, ...
@@ -62,11 +62,11 @@ function [xbase, fbase, nf, fhist, xhist, invalid_points, ...
 
 Owns the full pre-poll block including its entry condition
 (`use_productive_direction_memory && ~isempty(productive_direction_memory)
-&& nf < MaxFunctionEvaluations`). Initializes
-`pre_poll_memory_succeeded` to false and sets it true only when a retained
-direction is accepted. All other in/out arguments are threaded through
-unchanged in meaning. Preserves list order, duplicate handling (unchanged,
-still owned by `remember_accelerated_bds_direction`), the trial step
+&& nf < MaxFunctionEvaluations`). All in/out arguments are threaded through
+unchanged in meaning. Acceptance of a retained direction is represented by
+the resulting decrease in `fbase`; no separate success flag is needed.
+Preserves list order, duplicate handling (unchanged, still owned by
+`remember_accelerated_bds_direction`), the trial step
 `max(mean(alpha_all), stored_step)`, candidate acceptance, target checks, the
 at-most-two extrapolation evaluations after an accepted direction, history and
 invalid-point recording, evaluation budget, termination and exitflag
@@ -106,6 +106,6 @@ history, termination and exitflag updates of the moved block.
 `iteration_step`, `iteration_step_norm`, and `iteration_improved` are computed
 in the main iteration body (they consolidate the polling result and feed the
 gradient estimation and stopping logic). `xbase_iteration_start`, `fbase_iteration_start`,
-`regular_poll_succeeded`, all ordinary BDS polling state, `fopt`/`xopt`,
-`fopt_window`, the objective-change stop, and the gradient estimation/stop
-logic remain in the main solver.
+all ordinary BDS polling state, `fopt`/`xopt`, `fopt_window`, the
+objective-change stop, and the gradient estimation/stop logic remain in the
+main solver.

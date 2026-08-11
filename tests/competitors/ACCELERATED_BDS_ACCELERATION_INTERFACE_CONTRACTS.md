@@ -42,7 +42,6 @@ appropriate layer).
 | `terminate` | termination state | never read; incoming provably `false` | yes (only together with `target_reached`) | polling-loop guard, post-poll guard, loop exit | phase result | keep as pure result |
 | `exitflag` | termination state | never read | yes (only `FTARGET_REACHED`, only together with `target_reached`) | output message | phase result | keep as pure result |
 | `iteration_improved` | iteration flag | no | yes (set true on acceptance) | none before caller re-derives it | redundant | **drop** (see below) |
-| `pre_poll_memory_succeeded` (output) | — | — | yes | none remaining | phase result | later dropped (no remaining reader) |
 
 Proof obligations for the two non-obvious rows:
 
@@ -230,11 +229,10 @@ All runs on this machine via
   `post_poll_acceleration_succeeded = false` and `iteration_improved = false`
   at the top of the iteration body are still needed (the post-poll guard may
   skip the phase, and the polling path consumes the flags).
-- Follow-up cleanup: `pre_poll_memory_succeeded` and
-  `regular_poll_succeeded` had no remaining reader and were deleted; the
-  pre-poll `result.succeeded` field was removed with them; the
-  reference-consistency test was rewritten without snapshot variables.
-  accel passed, gradstop passed.
+- Follow-up cleanup: two success flags with no remaining reader were deleted,
+  and the unused pre-poll `result.succeeded` field was removed with them. The
+  reference-consistency test was rewritten without snapshot variables. Accel
+  passed, gradstop passed.
 - Stage 6 (helper headers and call-site comments): accel passed, gradstop
   passed.
 - Stage 7 final acceptance: accel passed, gradstop passed,
