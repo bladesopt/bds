@@ -1,4 +1,4 @@
-function [solver_scores, profile_scores] = profile_optiprofiler(options)
+function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
     clc
 
     path_tests = fileparts(mfilename('fullpath'));
@@ -201,12 +201,13 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
         options.run_plain = false;
     end
     solvers = cell(1, length(options.solver_names));
+    has_auto_alpha_candidate = false;
     for i = 1:length(options.solver_names)
         switch options.solver_names{i}
             case 'bds-infinite'
                 solvers{i} = @bds_default;
             case 'bds-finite'
-                solvers{i} = @bds_tmp_test;
+                solvers{i} = @bds_finite_test;
             case 'bds'
                 solvers{i} = @bds_test;
             case 'bds-default'
@@ -237,6 +238,15 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @(fun, x0) fminunc_adaptive(fun, x0, options.noise_level);
             case 'fd-bfgs'
                 solvers{i} = @fminunc_test;
+            case {'fd-bfgs-500n', 'fd_bfgs_500n'}
+                if isfield(options, 'noise_level')
+                    noise_level_for_bfgs = options.noise_level;
+                    solvers{i} = @(fun, x0) fd_bfgs_500n_test( ...
+                        fun, x0, true, noise_level_for_bfgs);
+                else
+                    solvers{i} = @(fun, x0) fd_bfgs_500n_test( ...
+                        fun, x0, false, []);
+                end
             case {'bfgs-200n', 'bfgs_200n'}
                 if isfield(options, 'noise_level')
                     noise_level_for_bfgs = options.noise_level;
@@ -250,20 +260,24 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @praxis_test;
             case 'nelder-mead'
                 solvers{i} = @fminsearch_test;
+            case {'nelder-mead-500n', 'nelder_mead_500n'}
+                solvers{i} = @fminsearch_test;
             case {'nelder-mead-200n', 'nelder_mead_200n', 'fminsearch-200n', 'fminsearch_200n'}
                 solvers{i} = @fminsearch_200n_test;
             case 'ds'
                 solvers{i} = @ds_test;
+            case {'ds-500n', 'ds_500n'}
+                solvers{i} = @ds_500n_test;
             case {'ds-200n', 'ds_200n'}
                 solvers{i} = @ds_200n_test;
             case {'ds-baseline-200n', 'ds_baseline_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'ds', false, false, false, 200, 1e-6);
             case {'ds-pattern-momentum-200n', 'ds_pattern_momentum_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'ds', false, true, true, 200, 1e-6);
             case {'accelerated-ds-all-on-200n', 'accelerated_ds_all_on_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'ds', true, true, true, 200, 1e-6);
             case 'direct-search-orig'
                 solvers{i} = @ds_orig_test;
@@ -358,22 +372,22 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             case {'cbds-500n', 'cbds_500n'}
                 solvers{i} = @cbds_500n_test;
             case {'cbds-baseline-200n', 'cbds_baseline_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', false, false, false, 200, 1e-6);
             case {'cbds-memory-only-200n', 'cbds_memory_only_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', true, false, false, 200, 1e-6);
             case {'cbds-pattern-only-200n', 'cbds_pattern_only_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', false, true, false, 200, 1e-6);
             case {'cbds-momentum-only-200n', 'cbds_momentum_only_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', false, false, true, 200, 1e-6);
             case {'cbds-pattern-momentum-200n', 'cbds_pattern_momentum_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', false, true, true, 200, 1e-6);
             case {'accelerated-bds-all-on-200n', 'accelerated_bds_all_on_200n'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_profile_test( ...
+                solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', true, true, true, 200, 1e-6);
             case 'cbds-development'
                 solvers{i} = @cbds_development_test;
@@ -415,13 +429,19 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @cbds_construct_directions_from_x0_test;
             case 'pds'
                 solvers{i} = @pds_test;
+            case {'pds-500n', 'pds_500n'}
+                solvers{i} = @pds_500n_test;
             case {'pds-200n', 'pds_200n'}
                 solvers{i} = @pds_200n_test;
             case 'bfo'
                 solvers{i} = @bfo_test;
+            case {'bfo-500n', 'bfo_500n'}
+                solvers{i} = @bfo_test;
             case {'bfo-200n', 'bfo_200n'}
                 solvers{i} = @bfo_200n_test;
             case 'newuoa'
+                solvers{i} = @newuoa_test;
+            case {'newuoa-500n', 'newuoa_500n'}
                 solvers{i} = @newuoa_test;
             case {'newuoa-200n', 'newuoa_200n'}
                 solvers{i} = @newuoa_200n_test;
@@ -437,22 +457,22 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @nomad_500n_test;
             case {'lean-evolved-bds', 'evolved-bds-lean'}
                 solvers{i} = @lean_evolved_bds_test;
-            case {'accelerated-bds', 'accelerated_bds', 'accelerated-bds-options', ...
-                    'accelerated_bds_options', 'lean-evolved-bds-full-options', ...
+            case {'bds-accelerated', 'bds_accelerated', 'accelerated-bds', ...
+                    'accelerated_bds', 'lean-evolved-bds-full-options', ...
                     'lean-evolved-bds-options', 'lean_evolved_bds_options'}
-                solvers{i} = @(fun, x0) accelerated_bds_options_test(fun, x0, true, true, true);
-            case {'accelerated-bds-budget-limited', 'accelerated_bds_budget_limited', ...
-                    'accelerated-bds-options-budget-limited', ...
-                    'accelerated_bds_options_budget_limited', ...
+                solvers{i} = @(fun, x0) bds_acceleration_test(fun, x0, true, true, true);
+            case {'bds-accelerated-budget-limited', 'bds_accelerated_budget_limited', ...
+                    'accelerated-bds-budget-limited', ...
+                    'accelerated_bds_budget_limited', ...
                     'lean-evolved-bds-options-budget-limited', ...
                     'lean_evolved_bds_options_budget_limited'}
-                solvers{i} = @accelerated_bds_options_budget_limited_test;
+                solvers{i} = @bds_acceleration_budget_limited_test;
             case 'lean-evolved-bds-no-memory'
-                solvers{i} = @(fun, x0) accelerated_bds_options_test(fun, x0, false, true, true);
+                solvers{i} = @(fun, x0) bds_acceleration_test(fun, x0, false, true, true);
             case 'lean-evolved-bds-memory-only'
-                solvers{i} = @(fun, x0) accelerated_bds_options_test(fun, x0, true, false, false);
+                solvers{i} = @(fun, x0) bds_acceleration_test(fun, x0, true, false, false);
             case 'lean-evolved-bds-pattern-momentum'
-                solvers{i} = @(fun, x0) accelerated_bds_options_test(fun, x0, false, true, true);
+                solvers{i} = @(fun, x0) bds_acceleration_test(fun, x0, false, true, true);
             case 'bds-no-additional-stopping'
                 solvers{i} = @cbds_simplified_test;
             case 'bds-simplified'
@@ -471,22 +491,82 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
                 solvers{i} = @cbds_orig_termination_test;
             case 'cbds-orig-smart-alpha-init'
                 solvers{i} = @cbds_orig_smart_alpha_init_test;
+            case {'auto-accelerated-all-on-500n-no-optional-stop', ...
+                    'auto_accelerated_all_on_500n_no_optional_stop'}
+                solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
+                    fun, x0, false, false, 20, 1e-6, 1, 1e-6);
+            case {'auto-accelerated-all-on-500n-default-combined-stop', ...
+                    'auto_accelerated_all_on_500n_default_combined_stop'}
+                solvers{i} = @accelerated_auto_combined_stop_500n_test;
+            case {'accelerated-unit-500n', 'accelerated_unit_500n'}
+                solvers{i} = @accelerated_unit_500n_test;
+            case {'accelerated-auto-500n', 'accelerated_auto_500n'}
+                solvers{i} = @accelerated_auto_500n_test;
+            case {'accelerated-auto-combined-stop-500n', ...
+                    'accelerated_auto_combined_stop_500n'}
+                solvers{i} = @accelerated_auto_combined_stop_500n_test;
             otherwise
-                error('Unknown solver');
+                [is_stopping_candidate, func_window_size, func_tol, ...
+                    grad_window_size, grad_tol, use_function_stop, ...
+                    use_gradient_stop, lipschitz_constant, ...
+                    use_gradient_reference_consistency, ...
+                    grad_reference_finite_difference_error_tol] = ...
+                    parse_accelerated_auto_stopping_solver_name( ...
+                    options.solver_names{i});
+                if is_stopping_candidate
+                    solvers{i} = @(fun, x0) accelerated_auto_stopping_profile_test( ...
+                        fun, x0, use_function_stop, use_gradient_stop, ...
+                        func_window_size, func_tol, grad_window_size, grad_tol, ...
+                        lipschitz_constant, use_gradient_reference_consistency, ...
+                        grad_reference_finite_difference_error_tol);
+                else
+                    [is_auto_candidate, c_x, c_tau, use_acceleration, ...
+                        use_unit_steps, max_eval_factor] = ...
+                        parse_auto_alpha_init_solver_name(options.solver_names{i});
+                    if ~is_auto_candidate
+                        error('Unknown solver');
+                    end
+                    has_auto_alpha_candidate = true;
+                    solvers{i} = @(fun, x0) auto_alpha_init_profile_test( ...
+                        fun, x0, c_x, c_tau, use_acceleration, ...
+                        use_unit_steps, max_eval_factor);
+                end
         end
     end
-    options.benchmark_id = [];
-    for i = 1:length(solvers)
-        if i == 1
-            options.benchmark_id = strrep(options.solver_names{i}, '-', '_');
+    if has_auto_alpha_candidate
+        auto_budgets = cellfun(@auto_alpha_init_budget_from_name, ...
+            options.solver_names(cellfun(@is_auto_alpha_init_solver_name, ...
+            options.solver_names)));
+        if numel(unique(auto_budgets)) ~= 1
+            error('profile_optiprofiler:MixedAutoAlphaBudgets', ...
+                'Automatic initial-step candidates in one benchmark must use one budget.');
+        end
+        required_max_eval_factor = auto_budgets(1);
+        if isfield(options, 'max_eval_factor') && ...
+                options.max_eval_factor ~= required_max_eval_factor
+            error('profile_optiprofiler:AutoAlphaBudgetMismatch', ...
+                'The profile max_eval_factor must match the candidate labels.');
+        end
+        options.max_eval_factor = required_max_eval_factor;
+    end
+    if ~isfield(options, 'benchmark_id') || isempty(options.benchmark_id)
+        options.benchmark_id = [];
+        for i = 1:length(solvers)
+            if i == 1
+                options.benchmark_id = strrep(options.solver_names{i}, '-', '_');
+            else
+                options.benchmark_id = [options.benchmark_id, '_', ...
+                    strrep(options.solver_names{i}, '-', '_')];
+            end
+        end
+        if isfield(options, 'problem_names')
+            options.benchmark_id = [options.benchmark_id, '_', ...
+                options.problem_names{1}, '_', num2str(options.n_runs)];
         else
-            options.benchmark_id = [options.benchmark_id, '_', strrep(options.solver_names{i}, '-', '_')];
+            options.benchmark_id = [options.benchmark_id, '_', ...
+                num2str(options.mindim), '_', num2str(options.maxdim), '_', ...
+                num2str(options.n_runs)];
         end
-    end
-    if isfield(options, 'problem_names')
-        options.benchmark_id = [options.benchmark_id, '_', options.problem_names{1}, '_', num2str(options.n_runs)];
-    else
-        options.benchmark_id = [options.benchmark_id, '_', num2str(options.mindim), '_', num2str(options.maxdim), '_', num2str(options.n_runs)];
     end
     switch options.feature_name
         case 'noisy'
@@ -663,11 +743,10 @@ function [solver_scores, profile_scores] = profile_optiprofiler(options)
             options = rmfield(options, 'noise_level');
 
     end
-    [solver_scores, profile_scores] = benchmark(solvers, options);
+    [solver_scores, profile_scores, curves] = benchmark(solvers, options);
     postprocess_summary_feature_titles(options, feature_display_name);
 
 end
-
 function postprocess_summary_feature_titles(options, feature_display_name)
 
     if isempty(feature_display_name) || ~isfield(options, 'savepath') || ~isfield(options, 'benchmark_id')
@@ -944,6 +1023,18 @@ function x = bfgs_200n_test(fun, x0, with_gradient, noise_level)
 
 end
 
+function x = fd_bfgs_500n_test(fun, x0, with_gradient, noise_level)
+
+    options.MaxObjectiveEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.with_gradient = with_gradient;
+    if with_gradient
+        options.noise_level = noise_level;
+    end
+    x = fminunc_budgeted_wrapper(fun, x0, options);
+
+end
+
 function x = praxis_test(fun, x0)
     %xtol = eps;
     xtol = 1e-6;
@@ -1027,6 +1118,14 @@ function x = ds_randomized_orthogonal_test(fun, x0)
     option.direction_set = Q;
     x = bds(fun, x0, option);
     
+end
+
+function x = ds_500n_test(fun, x0)
+
+    option.Algorithm = 'ds';
+    option.MaxFunctionEvaluations = 500*length(x0);
+    x = bds(fun, x0, option);
+
 end
 
 function x = ds_randomized_orthogonal_test_noisy(fun, x0, is_noisy)
@@ -1576,6 +1675,15 @@ function x = pds_test(fun, x0)
     
 end
 
+function x = pds_500n_test(fun, x0)
+
+    option.expand = 2;
+    option.shrink = 0.5;
+    option.MaxFunctionEvaluations = 500*length(x0);
+    x = pds(fun, x0, option);
+
+end
+
 function x = pds_200n_test(fun, x0)
 
     option.expand = 2;
@@ -1692,12 +1800,21 @@ function ensure_bfo_on_path()
     end
 
     home_dir = char(java.lang.System.getProperty('user.home'));
-    bfo_root = fullfile(home_dir, 'local', 'BFO');
-    candidate_paths = { ...
-        bfo_root, ...
-        fullfile(bfo_root, 'src'), ...
-        fullfile(bfo_root, 'matlab') ...
-    };
+    bfo_roots = { ...
+        getenv('BDS_BFO_ROOT'), ...
+        fullfile(home_dir, 'local', 'BFO'), ...
+        fullfile(home_dir, 'Documents', 'Nutstore', 'Transfer', ...
+        'optiprofiler_transfer'), ...
+        fullfile(home_dir, 'Documents', 'optiprofiler_results')};
+    candidate_paths = {};
+    for i_root = 1:numel(bfo_roots)
+        if ~isempty(bfo_roots{i_root})
+            candidate_paths = [candidate_paths, { ...
+                bfo_roots{i_root}, ...
+                fullfile(bfo_roots{i_root}, 'src'), ...
+                fullfile(bfo_roots{i_root}, 'matlab')}];
+        end
+    end
 
     for i_path = 1:numel(candidate_paths)
         if exist(candidate_paths{i_path}, 'dir')
@@ -1721,9 +1838,9 @@ function ensure_nomad_on_path()
     home_dir = char(java.lang.System.getProperty('user.home'));
     nomad_root = fullfile(home_dir, 'local', 'nomad');
     candidate_paths = { ...
+        fullfile(nomad_root, 'build', 'release', 'lib'), ...
         fullfile(nomad_root, 'interfaces', 'Matlab_MEX', 'Functions'), ...
-        fullfile(nomad_root, 'build', 'release', 'interfaces', 'Matlab_MEX'), ...
-        fullfile(nomad_root, 'build', 'release', 'lib') ...
+        fullfile(nomad_root, 'build', 'release', 'interfaces', 'Matlab_MEX') ...
     };
 
     for i_path = 1:numel(candidate_paths)
@@ -1772,36 +1889,298 @@ function x = lean_evolved_bds_test(fun, x0)
 
 end
 
-function x = accelerated_bds_options_test(fun, x0, use_memory, use_pattern, use_momentum)
+function x = bds_acceleration_test(fun, x0, use_memory, use_pattern, use_momentum)
 
     options.use_productive_direction_memory = use_memory;
-    options.use_sweep_pattern_direction = use_pattern;
+    options.use_iteration_pattern_step = use_pattern;
     options.use_momentum_extrapolation = use_momentum;
-    x = accelerated_bds_options(fun, x0, options);
+    x = bds(fun, x0, options);
 
 end
 
-function x = accelerated_bds_options_profile_test( ...
+function x = bds_acceleration_profile_test( ...
     fun, x0, algorithm, use_memory, use_pattern, use_momentum, ...
     max_eval_factor, step_tolerance)
 
     options.Algorithm = algorithm;
     options.use_productive_direction_memory = use_memory;
-    options.use_sweep_pattern_direction = use_pattern;
+    options.use_iteration_pattern_step = use_pattern;
     options.use_momentum_extrapolation = use_momentum;
     options.MaxFunctionEvaluations = max_eval_factor*length(x0);
     options.StepTolerance = step_tolerance;
-    x = accelerated_bds_options(fun, x0, options);
+    x = bds(fun, x0, options);
 
 end
 
-function x = accelerated_bds_options_budget_limited_test(fun, x0)
+function x = bds_acceleration_budget_limited_test(fun, x0)
 
     options.use_productive_direction_memory = true;
-    options.use_sweep_pattern_direction = true;
+    options.use_iteration_pattern_step = true;
     options.use_momentum_extrapolation = true;
     options.StepTolerance = 1e-12;
-    x = accelerated_bds_options(fun, x0, options);
+    x = bds(fun, x0, options);
+
+end
+
+function x = accelerated_unit_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 1;
+    x = bds(fun, x0, options);
+
+end
+
+function x = accelerated_auto_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 'auto';
+    x = bds(fun, x0, options);
+
+end
+
+function x = accelerated_auto_combined_stop_500n_test(fun, x0)
+
+    options = accelerated_500n_profile_options(x0);
+    options.alpha_init = 'auto';
+    options.use_function_value_stop = true;
+    options.func_window_size = 20;
+    options.func_tol = 1e-6;
+    options.use_estimated_gradient_stop = true;
+    options.grad_window_size = 1;
+    options.grad_tol = 1e-2;
+    options.lipschitz_constant = 1e3;
+    options.use_gradient_reference_consistency = true;
+    options.grad_reference_finite_difference_error_tol = 1/30;
+    x = bds(fun, x0, options);
+
+end
+
+function options = accelerated_500n_profile_options(x0)
+
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.expand = 1.8;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.seed = 0;
+    options.use_productive_direction_memory = true;
+    options.use_iteration_pattern_step = true;
+    options.use_momentum_extrapolation = true;
+    options.use_function_value_stop = false;
+    options.use_estimated_gradient_stop = false;
+
+end
+
+function x = auto_alpha_init_profile_test( ...
+        fun, x0, c_x, c_tau, use_acceleration, use_unit_steps, max_eval_factor)
+
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = max_eval_factor*length(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.expand = 1.8;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.seed = 0;
+    options.use_function_value_stop = false;
+    options.use_estimated_gradient_stop = false;
+    if use_unit_steps
+        alpha_init = ones(length(x0), 1);
+    else
+        alpha_init = auto_alpha_init_candidate( ...
+            x0, options.StepTolerance, c_x, c_tau);
+    end
+
+    if use_acceleration
+        options.use_productive_direction_memory = true;
+        options.use_iteration_pattern_step = true;
+        options.use_momentum_extrapolation = true;
+        options.alpha_init = alpha_init;
+        x = bds(fun, x0, options);
+    else
+        options.alpha_init = alpha_init;
+        x = bds(fun, x0, options);
+    end
+
+end
+
+function x = accelerated_auto_stopping_profile_test(fun, x0, ...
+    use_function_stop, use_gradient_stop, func_window_size, func_tol, ...
+    grad_window_size, grad_tol, lipschitz_constant, ...
+    use_gradient_reference_consistency, grad_reference_finite_difference_error_tol)
+
+    if nargin < 9
+        lipschitz_constant = 1e3;
+    end
+    if nargin < 10
+        use_gradient_reference_consistency = false;
+    end
+    if nargin < 11
+        grad_reference_finite_difference_error_tol = 1/30;
+    end
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = 500*length(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.expand = 1.8;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.seed = 0;
+    options.use_productive_direction_memory = true;
+    options.use_iteration_pattern_step = true;
+    options.use_momentum_extrapolation = true;
+    options.alpha_init = auto_alpha_init_candidate( ...
+        x0, options.StepTolerance, 1, 1);
+    options.use_function_value_stop = use_function_stop;
+    options.func_window_size = func_window_size;
+    options.func_tol = func_tol;
+    options.use_estimated_gradient_stop = use_gradient_stop;
+    options.grad_window_size = grad_window_size;
+    options.grad_tol = grad_tol;
+    options.lipschitz_constant = lipschitz_constant;
+    options.use_gradient_reference_consistency = ...
+        use_gradient_reference_consistency;
+    options.grad_reference_finite_difference_error_tol = ...
+        grad_reference_finite_difference_error_tol;
+    x = bds(fun, x0, options);
+
+end
+
+function [matched, func_window_size, func_tol, grad_window_size, grad_tol, ...
+        use_function_stop, use_gradient_stop, lipschitz_constant, ...
+        use_gradient_reference_consistency, ...
+        grad_reference_finite_difference_error_tol] = ...
+    parse_accelerated_auto_stopping_solver_name(solver_name)
+
+    expression = ['^auto-accelerated-all-on-500n-', ...
+        '(stop|function-stop|gradient-stop)-', ...
+        'fw([0-9]+)-ft1em([0-9]+)-gw([0-9]+)-gt1em([0-9]+)$'];
+    solver_name_full = char(solver_name);
+    solver_name_without_scale = regexprep(solver_name_full, ...
+        '-grs[0-9]+(?:p[0-9]+)?$', '');
+    solver_name_base = regexprep(solver_name_without_scale, ...
+        '-grc[0-9]+(?:p[0-9]+)?$', '');
+    solver_name_core = regexprep(solver_name_base, '-lc1em[0-9]+$', '');
+    tokens = regexp(solver_name_core, expression, 'tokens', 'once');
+    matched = ~isempty(tokens);
+    if ~matched
+        func_window_size = NaN;
+        func_tol = NaN;
+        grad_window_size = NaN;
+        grad_tol = NaN;
+        use_function_stop = false;
+        use_gradient_stop = false;
+        lipschitz_constant = NaN;
+        use_gradient_reference_consistency = false;
+        grad_reference_finite_difference_error_tol = NaN;
+        return
+    end
+
+    stop_kind = tokens{1};
+    func_window_size = str2double(tokens{2});
+    func_tol = 10^(-str2double(tokens{3}));
+    grad_window_size = str2double(tokens{4});
+    grad_tol = 10^(-str2double(tokens{5}));
+    use_function_stop = ~strcmp(stop_kind, 'gradient-stop');
+    use_gradient_stop = ~strcmp(stop_kind, 'function-stop');
+    lc_tokens = regexp(solver_name_full, ...
+        '-lc1em([0-9]+)(?:-grc[0-9]+(?:p[0-9]+)?)?$', ...
+        'tokens', 'once');
+    if isempty(lc_tokens)
+        lipschitz_constant = 1e3;
+    else
+        lipschitz_constant = 10^str2double(lc_tokens{1});
+    end
+    grc_tokens = regexp(solver_name_full, ...
+        '-grc([0-9]+(?:p[0-9]+)?)(?:-grs[0-9]+(?:p[0-9]+)?)?$', ...
+        'tokens', 'once');
+    use_gradient_reference_consistency = ~isempty(grc_tokens);
+    if use_gradient_reference_consistency
+        grad_reference_finite_difference_error_tol = str2double( ...
+            strrep(grc_tokens{1}, 'p', '.')) / 3;
+    else
+        grad_reference_finite_difference_error_tol = 1/30;
+    end
+    grs_tokens = regexp(solver_name_full, ...
+        '-grs([0-9]+(?:p[0-9]+)?)$', 'tokens', 'once');
+    if ~isempty(grs_tokens)
+        % Historical solver names encoded the effective reference tolerance
+        % as a multiplier of the old grad_tol. Convert that label at the
+        % experiment boundary; the solver itself accepts only the resulting
+        % single grad_tol.
+        grad_tol = str2double(strrep(grs_tokens{1}, 'p', '.')) * grad_tol;
+    end
+
+end
+
+function [matched, c_x, c_tau, use_acceleration, use_unit_steps, ...
+        max_eval_factor] = ...
+        parse_auto_alpha_init_solver_name(solver_name)
+
+    candidate_expression = ['^auto-cx-([0-9]+(?:p[0-9]+)?)-', ...
+        'ctau-([0-9]+(?:p[0-9]+)?)-', ...
+        '(plain|accelerated-all-on)-([0-9]+)n$'];
+    unit_expression = '^unit-(plain|accelerated-all-on)-([0-9]+)n$';
+    tokens = regexp(char(solver_name), candidate_expression, 'tokens', 'once');
+    unit_tokens = regexp(char(solver_name), unit_expression, 'tokens', 'once');
+    use_unit_steps = isempty(tokens) && ~isempty(unit_tokens);
+    if use_unit_steps
+        tokens = {'1', '1', unit_tokens{1}, unit_tokens{2}};
+    end
+    matched = ~isempty(tokens);
+    c_x = NaN;
+    c_tau = NaN;
+    use_acceleration = false;
+    use_unit_steps = use_unit_steps && matched;
+    max_eval_factor = NaN;
+    if ~matched
+        return;
+    end
+
+    c_x = str2double(strrep(tokens{1}, 'p', '.'));
+    c_tau = str2double(strrep(tokens{2}, 'p', '.'));
+    if ~(isfinite(c_x) && c_x > 0 && isfinite(c_tau) && c_tau > 0)
+        error('profile_optiprofiler:InvalidAutoAlphaCoefficient', ...
+            'Automatic initial-step coefficients must be finite and positive.');
+    end
+    use_acceleration = strcmp(tokens{3}, 'accelerated-all-on');
+    max_eval_factor = str2double(tokens{4});
+    if ~(isfinite(max_eval_factor) && max_eval_factor > 0 && ...
+            max_eval_factor == floor(max_eval_factor))
+        error('profile_optiprofiler:InvalidAutoAlphaBudget', ...
+            'The automatic initial-step budget must be a positive integer.');
+    end
+
+end
+
+function matched = is_auto_alpha_init_solver_name(solver_name)
+
+    [matched, ~, ~, ~, ~, ~] = parse_auto_alpha_init_solver_name(solver_name);
+
+end
+
+function max_eval_factor = auto_alpha_init_budget_from_name(solver_name)
+
+    [matched, ~, ~, ~, ~, max_eval_factor] = ...
+        parse_auto_alpha_init_solver_name(solver_name);
+    if ~matched
+        error('profile_optiprofiler:InvalidAutoAlphaSolverName', ...
+            'Expected an automatic initial-step candidate label.');
+    end
 
 end
 
@@ -1954,7 +2333,7 @@ function alpha_init = hybrid_alpha_init_for_profile(x0, StepTolerance, relative_
 
 end
 
-function x = bds_tmp_test(fun, x0)
+function x = bds_finite_test(fun, x0)
 
     option.expand = 2;
     option.shrink = 0.5;

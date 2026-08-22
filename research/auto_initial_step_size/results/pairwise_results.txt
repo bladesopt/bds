@@ -1,0 +1,29 @@
+source_data=/home/lhtian97/Work/bds/tests/testdata/auto_initial_step_size_500n_full_factorial_full_20260721_232117/accelerated_all_on/auto_alpha_accel_4x4_500n_plain_s2mpj_26_07_21_23_21_17/u_6_50_plain_20260721_232119/test_log/data_for_loading.mat
+source_timestamp=20260721_232119
+problem_count=122
+analysis_horizons=200*N,500*N
+tolerances=1e-1,...,1e-10
+score_columns=unit_baseline,auto_configuration
+output_based_profiles=false
+figure_200=cx1_ctau1_vs_unit_200n.pdf
+figure_500=cx1_ctau1_vs_unit_500n.pdf
+figure_data_200=cx1_ctau1_vs_unit_200n.mat
+figure_data_500=cx1_ctau1_vs_unit_500n.mat
+optiprofiler_commit=e8a4c44f555eafaddc3530b68c54fe1a78459cd9
+configuration_01=auto-cx-0p1-ctau-1-accelerated-all-on-500n | 200N=1,0.95257341749251 | 500N=1,0.903566344043845
+configuration_02=auto-cx-0p1-ctau-2-accelerated-all-on-500n | 200N=0.999996506177332,0.96661856704904 | 500N=1,0.915722531931086
+configuration_03=auto-cx-0p1-ctau-5-accelerated-all-on-500n | 200N=0.999996506177332,0.966605629070992 | 500N=1,0.915759163931867
+configuration_04=auto-cx-0p1-ctau-10-accelerated-all-on-500n | 200N=0.99999886808638,0.966868640307253 | 500N=1,0.916063259923675
+configuration_05=auto-cx-0p2-ctau-1-accelerated-all-on-500n | 200N=0.950081542862067,1 | 500N=0.951233474940498,1
+configuration_06=auto-cx-0p2-ctau-2-accelerated-all-on-500n | 200N=0.950359462130991,1 | 500N=0.951618223867979,1
+configuration_07=auto-cx-0p2-ctau-5-accelerated-all-on-500n | 200N=0.950273167586862,1 | 500N=0.960722782969328,1
+configuration_08=auto-cx-0p2-ctau-10-accelerated-all-on-500n | 200N=0.950829259059912,1 | 500N=0.951477164008369,1
+configuration_09=auto-cx-0p5-ctau-1-accelerated-all-on-500n | 200N=0.89124756990169,1 | 500N=0.89570201711143,1
+configuration_10=auto-cx-0p5-ctau-2-accelerated-all-on-500n | 200N=0.89126907351722,1 | 500N=0.895724889712101,1
+configuration_11=auto-cx-0p5-ctau-5-accelerated-all-on-500n | 200N=0.891778121699587,1 | 500N=0.906424085795692,1
+configuration_12=auto-cx-0p5-ctau-10-accelerated-all-on-500n | 200N=0.892702784224175,1 | 500N=0.89753340894943,1
+configuration_13=auto-cx-1-ctau-1-accelerated-all-on-500n | 200N=0.897781354722606,1 | 500N=0.897487271385312,1
+configuration_14=auto-cx-1-ctau-2-accelerated-all-on-500n | 200N=0.898714535072456,1 | 500N=0.89813310885153,1
+configuration_15=auto-cx-1-ctau-5-accelerated-all-on-500n | 200N=0.898435269087884,1 | 500N=0.898151264060124,1
+configuration_16=auto-cx-1-ctau-10-accelerated-all-on-500n | 200N=0.88683510164694,1 | 500N=0.887115575363396,1
+generated_at=23-Jul-2026 11:29:26

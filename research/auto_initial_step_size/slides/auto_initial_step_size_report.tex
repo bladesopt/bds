@@ -1,0 +1,363 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{colortbl}
+
+\setmainfont{Avenir Next}
+\setsansfont{Avenir Next}
+\setmonofont{Menlo}
+\setCJKmainfont[Path=/System/Library/Fonts/,BoldFont=STHeiti Medium.ttc]{Hiragino Sans GB.ttc}
+\setCJKsansfont[Path=/System/Library/Fonts/,BoldFont=STHeiti Medium.ttc]{Hiragino Sans GB.ttc}
+\setCJKmonofont[Path=/System/Library/Fonts/]{Hiragino Sans GB.ttc}
+
+\definecolor{BDSBlue}{HTML}{174A7E}
+\definecolor{BDSCyan}{HTML}{2A7F9E}
+\definecolor{BDSGreen}{HTML}{247A61}
+\definecolor{BDSOrange}{HTML}{C36C2E}
+\definecolor{BDSInk}{HTML}{263238}
+\definecolor{BDSGray}{HTML}{667085}
+\definecolor{BDSLight}{HTML}{EDF3F7}
+
+\setbeamercolor{normal text}{fg=BDSInk,bg=white}
+\setbeamercolor{structure}{fg=BDSBlue}
+\setbeamercolor{frametitle}{fg=white,bg=BDSBlue}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{subtitle}{fg=white}
+\setbeamercolor{block title}{fg=white,bg=BDSBlue}
+\setbeamercolor{block body}{fg=BDSInk,bg=BDSLight}
+\setbeamercolor{alerted text}{fg=BDSOrange}
+\setbeamerfont{frametitle}{series=\bfseries,size=\large}
+\setbeamerfont{title}{series=\bfseries,size=\LARGE}
+\setbeamerfont{subtitle}{size=\large}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\color{BDSCyan}\small$\blacktriangleright$}
+\setbeamertemplate{itemize subitem}{\color{BDSCyan}\scriptsize$\bullet$}
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+  \begin{beamercolorbox}[wd=.85\paperwidth,ht=2.7ex,dp=1.1ex,leftskip=1em]{author in head/foot}%
+    \color{BDSGray}\scriptsize Automatic initial step size and stopping
+  \end{beamercolorbox}%
+  \begin{beamercolorbox}[wd=.15\paperwidth,ht=2.7ex,dp=1.1ex,rightskip=1em plus1fil]{date in head/foot}%
+    \color{BDSGray}\scriptsize\insertframenumber/\inserttotalframenumber
+  \end{beamercolorbox}}}
+
+\newcommand{\good}[1]{\textcolor{BDSGreen}{\bfseries #1}}
+\newcommand{\warn}[1]{\textcolor{BDSOrange}{\bfseries #1}}
+\newcommand{\score}[1]{\texttt{#1}}
+\newcommand{\tight}{\setlength{\itemsep}{0.35em}\setlength{\parskip}{0pt}}
+
+\title{Accelerated BDS 的 automatic initial step size 与 stopping}
+\subtitle{从 full-factorial screen 到可交付策略}
+\author{实验结论汇报}
+\date{2026-07-26}
+
+\begin{document}
+
+{\setbeamercolor{background canvas}{bg=BDSBlue}
+\begin{frame}[plain]
+  \vfill
+  \titlepage
+  \vfill
+  \begin{center}
+    \color{white!80}\small 122 个 S2MPJ problems；plain 与 linearly transformed；OptiProfiler 原生 profiles
+  \end{center}
+\end{frame}}
+
+\begin{frame}{结论先行：参数已经形成一个简单、有效的默认策略}
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\begin{block}{Automatic initial step}
+\small
+\[
+\alpha_{0,i}=\max\{c_x|x_{0,i}|,\;c_\tau\tau_i\},
+\]
+where $\tau_i=\texttt{StepTolerance}_i$ and $(c_x,c_\tau)=(1,1)$;
+exact zero coordinate 保留 neutral unit step。
+
+\medskip
+\good{选择理由：}明显战胜 unit-step baseline；唯一略高的 challenger $(1,2)$ 只高 $10^{-4}$ 量级，不足以引入更奇怪的 default。
+\end{block}
+
+\column{0.48\textwidth}
+\begin{block}{Combined stopping}
+\begin{itemize}\tight
+  \item function-only：\texttt{window=20}, \texttt{tol=1e-6}
+  \item gradient-only：\texttt{window=1}, \texttt{tol=1e-6}, $\rho=10^{-2}$
+  \item 两者取 OR，但只有本轮 post-poll acceleration 失败才允许停机
+  \item gradient-only stop 复用 polling values，\good{不增加 function evaluations}
+\end{itemize}
+\end{block}
+\end{columns}
+
+\vspace{0.5em}
+\centering
+\colorbox{BDSLight}{\parbox{0.92\textwidth}{\centering
+\good{最终结果：}plain 节省 \textbf{20.15\%}；linearly transformed 节省 \textbf{18.78\%}；五个 targets 均保持 \textbf{122/122}。}}
+\end{frame}
+
+\begin{frame}{我们怎样覆盖“各种可能的尝试”}
+\small
+\begin{columns}[T,onlytextwidth]
+\column{0.56\textwidth}
+\begin{itemize}\tight
+  \item \textbf{Problems：}122 个 unconstrained S2MPJ problems，dimension $6$--$50$
+  \item \textbf{Base solver：}三个 acceleration switches 全开
+  \item \textbf{Grid：}$c_x\in\{0.1,0.2,0.5,1\}$，$c_\tau\in\{1,2,5,10\}$
+  \item \textbf{Comparators：}16 个 automatic candidates + accelerated unit-step baseline
+  \item \textbf{Budget：}每个 identity 一次运行到 $500N$；$200N$ 从同一 history 截断并独立重算 targets
+  \item \textbf{Accuracy：}$\tau=10^{-1},\ldots,10^{-10}$
+  \item \textbf{Scoring：}OptiProfiler history-based performance-profile score；pairwise 与 full-17 common pool 都检查
+\end{itemize}
+
+\column{0.40\textwidth}
+\begin{block}{可复现记录}
+\begin{itemize}\tight
+  \item raw data 保留在服务器
+  \item local manifest 记录 commit、solver、problems、options 与路径
+  \item figures 均由 OptiProfiler 原生生成
+  \item $200N$ 与 $500N$ 使用各自 horizon 的 common targets
+\end{itemize}
+\end{block}
+\end{columns}
+
+\vfill
+\centering\footnotesize
+OptiProfiler commit：\texttt{e8a4c44f555eafaddc3530b68c54fe1a78459cd9}
+\end{frame}
+
+\begin{frame}{Full-factorial screen：决定性因素是 $c_x$，不是复杂调参}
+\small
+\centering
+\begin{tabular}{lccp{4.8cm}}
+\toprule
+Configuration group & Score at $200N$ & Score at $500N$ & 结论 \\
+\midrule
+unit baseline & 0.8903 & 0.9081 & 明显低于最终 automatic rule \\
+$c_x=0.1$ & 0.7987--0.8065 & 0.7995--0.8022 & 整组退化，直接淘汰 \\
+$c_x=0.2$ & 0.8873--0.8933 & 0.9275--0.9315 & $500N$ 有改善，但 $200N$ 不稳定 \\
+$c_x=0.5$ & 0.9332--0.9402 & 0.9528--0.9584 & 稳定改善，但仍明显落后于 $c_x=1$ \\
+\good{$(1,1)$} & \good{0.999626} & \good{0.999294} & 简单、稳定、当前 production rule \\
+$(1,2)$ & 0.999707 & 0.999563 & 数值略高，但优势不 material \\
+$(1,5)$ / $(1,10)$ & 0.9968 / 0.9970 & 0.9971 / 0.9949 & 没有继续增大 $c_\tau$ 的收益 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.9em}
+\begin{block}{读表方式}
+这里是 unit baseline 与全部 16 candidates 的 \textbf{同一个 full-17 common pool}，可以跨候选统一排序；score 越大越好。
+\end{block}
+\end{frame}
+
+\begin{frame}{$(1,1)$ 在 $200N$ 已经明显优于 unit-step baseline}
+\centering
+\includegraphics[width=0.96\textwidth,height=0.68\textheight,keepaspectratio]{../results/cx1_ctau1_vs_unit_200n.pdf}
+
+\vspace{0.2em}
+\footnotesize OptiProfiler-native history-based summary；$\tau=10^{-1},\ldots,10^{-10}$；$200N$ targets 由 $200N$ history prefix 独立计算。
+\end{frame}
+
+\begin{frame}{$(1,1)$ 的优势持续到 $500N$}
+\centering
+\includegraphics[width=0.96\textwidth,height=0.68\textheight,keepaspectratio]{../results/cx1_ctau1_vs_unit_500n.pdf}
+
+\vspace{0.2em}
+\footnotesize OptiProfiler-native history-based summary；这不是自定义重画的曲线。
+\end{frame}
+
+\begin{frame}{为什么不把 $(1,2)$ 换成新的 default}
+\small
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\begin{block}{观察到的优势}
+\begin{tabular}{lcc}
+\toprule
+ & $200N$ & $500N$ \\
+\midrule
+$(1,1)$ & 0.9996261 & 0.9992936 \\
+$(1,2)$ & 0.9997073 & 0.9995633 \\
+Delta & $8.12\times10^{-5}$ & $2.70\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{block}
+
+\column{0.48\textwidth}
+\begin{block}{Engineering decision}
+\begin{itemize}\tight
+  \item 差异远小于 full grid 中不同 $c_x$ 带来的变化
+  \item $(1,1)$ 与原 scale rule 一致：不引入额外 multiplier
+  \item 只有\emph{明确优于}当前 default 的 candidate 才值得替换
+  \item 因此不在 $c_\tau=2$ 周围继续 fine grid
+\end{itemize}
+\end{block}
+\end{columns}
+
+\vfill
+\centering
+\colorbox{BDSLight}{\parbox{0.90\textwidth}{\centering
+\good{推荐保持 $(c_x,c_\tau)=(1,1)$：}不是忽略了 $(1,2)$，而是把“统计上可见”与“工程上值得改 default”明确区分。}}
+\end{frame}
+
+\begin{frame}{Stopping 的设计约束：能前进就不停，且不为停机多算函数值}
+\small
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\begin{block}{共同 safety gate}
+function-value 或 estimated-gradient criterion 即使满足，也必须同时满足：
+\[
+\text{current post-poll acceleration failed}.
+\]
+这保证 pattern / momentum 仍能推进时不会提前终止。
+\end{block}
+
+\column{0.48\textwidth}
+\begin{block}{Gradient reliability}
+\begin{itemize}\tight
+  \item 同一 $x_{\mathrm{base}}$ 上两个连续 central-difference estimates
+  \item relative difference 通过 $\theta$-aware self-consistency gate
+  \item reliable reference 后使用 $\rho\max(1,\|g_{\rm ref}\|)$，$\rho=10^{-2}$
+  \item 所有量来自普通 polling；true gradient 只用于离线 diagnosis
+\end{itemize}
+\end{block}
+\end{columns}
+
+\vspace{0.6em}
+\begin{alertblock}{为什么需要 reliability gate}
+在 transformed SBRYBND / SCURLY20，early gradient estimate 可比 true norm 大多个数量级，而固定 \texttt{lipschitz\_constant=1e3} 的 bound 严重低估 actual error。最终修复 reference 语义，而不是把 Lipschitz guess 当作 performance parameter。
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{四方比较：两种 stopping mechanisms 各自有效，组合后最好}
+\small
+\centering
+\begin{tabular}{llrrr}
+\toprule
+Feature & Strategy & Evaluations & Savings & Activations \\
+\midrule
+plain & no-stop & 443927 & 0 & 0 \\
+plain & function-only & 357520 & 86407 & 76 \\
+plain & gradient-only & 440309 & 3618 & 14 \\
+\rowcolor{BDSLight} plain & \good{combined OR} & \good{354495} & \good{89432} & 81 \\
+\midrule
+transformed & no-stop & 534414 & 0 & 0 \\
+transformed & function-only & 451251 & 83163 & 70 \\
+transformed & gradient-only & 517021 & 17393 & 11 \\
+\rowcolor{BDSLight} transformed & \good{combined OR} & \good{434060} & \good{100354} & 77 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.8em}
+\begin{itemize}\tight
+  \item function-only 提供主要节省；gradient-only 独立触发 $14+11=25$ 个 cases
+  \item combined 比 function-only 额外节省：plain 3025，transformed 17191 evaluations
+  \item 四种 strategies 在五个 output-based targets 上都保持 \good{122/122}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Plain：combined OR 在同一 pool 中得分最高}
+\centering
+\includegraphics[width=0.97\textwidth,height=0.68\textheight,keepaspectratio]{../stopping/plain_no_stop_function_gradient_combined_500n_optiprofiler.pdf}
+
+\vspace{0.2em}
+\footnotesize OptiProfiler-native output-performance summary；legend 已统一为 No-stop / Function-only / Gradient-only / Combined OR。
+\end{frame}
+
+\begin{frame}{Linearly transformed：同一组 stopping 参数仍然成立}
+\centering
+\includegraphics[width=0.97\textwidth,height=0.68\textheight,keepaspectratio]{../stopping/linearly_transformed_no_stop_function_gradient_combined_500n_optiprofiler.pdf}
+
+\vspace{0.2em}
+\footnotesize OptiProfiler-native output-performance summary；automatic initial step 与 acceleration 一起使用，没有为 transformed feature 另调一组 stopping 参数。
+\end{frame}
+
+\begin{frame}{参数不是“刚好挑中”：我们找到了安全边界}
+\small
+\begin{columns}[T,onlytextwidth]
+\column{0.53\textwidth}
+\begin{block}{Reference-relative tolerance $\rho$}
+\begin{tabular}{lcc}
+\toprule
+$\rho$ & Minimum solved & Total savings \\
+\midrule
+\good{0.0100} & \good{122/122} & 21011 \\
+0.0110 & 122/122 & 21062 \\
+\warn{0.0115} & \warn{121/122} & 21368 \\
+\bottomrule
+\end{tabular}
+
+\medskip
+$0.011$ 仅多省 51 次；$0.0115$ 已在 transformed PALMER2C 的 $10^{-5}$ target 失败。因此选择自然且离边界更远的 $0.01$。
+\end{block}
+
+\column{0.43\textwidth}
+\begin{block}{Consistency threshold}
+\begin{itemize}\tight
+  \item $0.1$ 与 $0.3$ 完全打平
+  \item $0.5$ 丢失一个 problem
+  \item 取安全平台左端点 $0.1$
+  \item production criterion 已升级为随 \texttt{shrink} 变化的 $\theta$-aware 形式
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{最终建议与 close 判断}
+\small
+\begin{columns}[T,onlytextwidth]
+\column{0.56\textwidth}
+\begin{block}{建议进入当前 accelerated BDS}
+\begin{itemize}\tight
+  \item automatic initial step：$(c_x,c_\tau)=(1,1)$
+  \item function stop：$(20,10^{-6})$
+  \item gradient stop：$(1,10^{-6})$，reliable reference，$\rho=10^{-2}$
+  \item function 与 gradient criteria 取 OR
+  \item post-poll acceleration failure 作为共同必要条件
+\end{itemize}
+\end{block}
+
+\column{0.40\textwidth}
+\begin{block}{为什么可以用于当前决策}
+\begin{itemize}\tight
+  \item 全 4-by-4 initial-step grid 已跑
+  \item $200N/500N$ 一致支持 $(1,1)$
+  \item plain / transformed 均完成 stopping validation
+  \item solved fraction 不损失
+  \item 两种 stopping mechanisms 均有独立贡献
+  \item 两项代码 equivalence / accounting verification 通过
+\end{itemize}
+\end{block}
+\end{columns}
+
+\vfill
+\centering
+\colorbox{BDSBlue}{\parbox{0.93\textwidth}{\centering\color{white}
+\bfseries 当前 engineering decision 可以 close：策略简单、证据完整、风险边界明确。\par
+\normalfont\footnotesize 若要做论文级 formal coefficient close，可再补 problem-level paired analysis、$c_\tau$ activation audit 与 transformed finalist audit；这些不改变当前推荐。}}
+\end{frame}
+
+\begin{frame}{Evidence map}
+\small
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+Artifact & 用途 \\
+\midrule
+\texttt{results/SCORES.md} & 16 个 candidates 的 pairwise scores、full-17 scores 与 coefficient decision \\
+\texttt{results/run\_manifest.txt} & server raw data、commit、122 problems、grid、budget、seed 与 OptiProfiler provenance \\
+\texttt{results/cx1\_ctau1\_vs\_unit\_\{200n,500n\}.pdf} & 最终 initial-step rule 对 unit-step baseline 的原生图 \\
+\texttt{stopping/RESULTS.md} & four-way evaluations、scores、solved fractions、boundary 与 final parameters \\
+\texttt{stopping/GRADIENT\_STOP\_INVESTIGATION.md} & concrete failure diagnosis、controlled search、full benchmark 与 no-extra-evaluation rationale \\
+\texttt{stopping/*combined*optiprofiler.pdf} & plain 与 linearly transformed 的 four-way OptiProfiler 原生图 \\
+\bottomrule
+\end{tabularx}
+
+\vfill
+\centering\footnotesize
+Server raw roots are recorded in the manifests; the repository retains only the reproducible scripts, machine-readable summaries, and decision-grade figures.
+\end{frame}
+
+\end{document}
