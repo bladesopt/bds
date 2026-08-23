@@ -134,9 +134,9 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
 - [x] 3. 核对最终 22 个 workflow 与 README 展示范围。
 - [x] 4. 完成 Gate A 全部本地检查。
 - [x] 5. 完成 Gate B 隔离服务器 MATLAB 检查。
-- [ ] 6. 提交最终计划并再次确认待发布 commit 和所有 push targets。
-- [ ] 7. fast-forward 并发布 `main`，不请求 reviewer。
-- [ ] 8. 核对公开 `main` 的 README、workflows 和 commit。
+- [x] 6. 提交最终计划并再次确认待发布 commit 和所有 push targets。
+- [x] 7. fast-forward 并发布 `main`，不请求 reviewer。
+- [x] 8. 核对公开 `main` 的 README、workflows 和 commit。
 - [ ] 9. 从公开 `main` 触发 12 个正式 workflows。
 - [ ] 10. 监控全部正式 runs，修复任何失败并重跑。
 - [ ] 11. 抽查正式 artifacts，回填最终证据并完成本计划。
@@ -191,3 +191,18 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
 - 完整回归输出 `BDS_REGRESSION_SUITE_OK`；真实 Optimization Toolbox 的
   no-gradient `fminunc_wrapper.m` smoke 输出 `BFGS_WRAPPER_SMOKE_OK`。
 - 验证完成后已经删除上述隔离临时目录。
+
+### Gate C
+
+- 最终发布计划首先提交为 `96eb4f61`；发布前重新 fetch canonical
+  `origin/main`，确认其 commit `988b2629` 是发布 commit 的祖先，允许纯
+  fast-forward。
+- 本地 `main` 已 fast-forward 到 `96eb4f61`。一次明确的
+  `git push origin main:main` 成功更新 `.git/config` 中的全部 12 个目标；没有
+  创建 PR，没有请求 Zaikun Zhang 或任何其他 reviewer。
+- 随后逐个使用 `git ls-remote` 核对 12 个仓库，所有 `refs/heads/main` 均精确
+  指向 `96eb4f61dfc41ba9df7af72f9fd315380c0ba3dc`。
+- 从公开 URL 下载的 `bladesopt/bds` README 与本地文件逐字节一致；GitHub API
+  显示公开 `main` 精确包含计划中的 22 个 workflow 文件。
+- 上述首次公开核对于 2026-08-23 19:32 CST 完成。回填本记录后还会产生一个只改
+  计划文档的最终记录 commit；正式 workflows 必须从该最终 `main` commit 触发。
