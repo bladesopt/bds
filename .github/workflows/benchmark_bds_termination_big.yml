@@ -49,10 +49,10 @@ jobs:
             options.mindim = 6;
             options.maxdim = 50;
             options.plibs = 's2mpj';
-            % Two noisy realizations exceeded GitHub's six-hour per-job limit
-            % for noisy_1e-3. Keep every problem and termination configuration,
-            % but use one complete realization so the formal matrix can finish.
-            options.n_runs = 1;
+            % Per-problem history plotting stalled after the DIXMAANI1 solves
+            % for noisy_1e-3. The final performance and data profiles do not
+            % depend on those auxiliary plots, so disable only their export.
+            options.draw_hist_plots = 'none';
             options.run_plain = false;
             options.summarize_log_ratio_profiles = false;
             profile_optiprofiler(options);
