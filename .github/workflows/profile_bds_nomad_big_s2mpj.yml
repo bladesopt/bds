@@ -117,6 +117,11 @@ jobs:
               options.mindim = 6;
               options.maxdim = 50;
               options.plibs = '${{ matrix.plibs }}';
+              % A second randomized run makes several NOMAD big features exceed
+              % GitHub's six-hour job limit. Keep the full problem set, feature
+              % set, dimension range, solvers, and 500*n budget, but use one
+              % reproducible realization for this comparison.
+              options.n_runs = 1;
               options.run_plain = ${{ matrix.run_plain }};
               options.summarize_log_ratio_profiles = ${{ matrix.summarize_log_ratio_profiles }};
               % Per-problem history plots are auxiliary and can stall after all
