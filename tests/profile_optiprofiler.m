@@ -247,6 +247,8 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                     solvers{i} = @(fun, x0) fd_bfgs_500n_test( ...
                         fun, x0, false, []);
                 end
+            case {'bfgs-no-gradient-500n', 'bfgs_no_gradient_500n'}
+                solvers{i} = @bfgs_no_gradient_500n_test;
             case {'bfgs-200n', 'bfgs_200n'}
                 if isfield(options, 'noise_level')
                     noise_level_for_bfgs = options.noise_level;
@@ -371,6 +373,27 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                 solvers{i} = @cbds_200n_test;
             case {'cbds-500n', 'cbds_500n'}
                 solvers{i} = @cbds_500n_test;
+            case {'bds-production-500n', 'bds_production_500n'}
+                solvers{i} = @bds_production_500n_test;
+            case {'bds-acceleration-off-500n', ...
+                    'bds_acceleration_off_500n', ...
+                    'bds-invalid-aware-500n', ...
+                    'bds_invalid_aware_500n'}
+                solvers{i} = @(fun, x0) bds_benchmark_profile_test( ...
+                    fun, x0, false, false, false);
+            case {'bds-acceleration-on-500n', 'bds_acceleration_on_500n'}
+                solvers{i} = @bds_production_500n_test;
+            case {'bds-function-value-stop-500n', ...
+                    'bds_function_value_stop_500n'}
+                solvers{i} = @(fun, x0) bds_benchmark_profile_test( ...
+                    fun, x0, true, true, false);
+            case {'bds-estimated-gradient-stop-500n', ...
+                    'bds_estimated_gradient_stop_500n'}
+                solvers{i} = @(fun, x0) bds_benchmark_profile_test( ...
+                    fun, x0, true, false, true);
+            case {'bds-combined-stop-500n', 'bds_combined_stop_500n'}
+                solvers{i} = @(fun, x0) bds_benchmark_profile_test( ...
+                    fun, x0, true, true, true);
             case {'cbds-baseline-200n', 'cbds_baseline_200n'}
                 solvers{i} = @(fun, x0) bds_acceleration_profile_test( ...
                     fun, x0, 'cbds', false, false, false, 200, 1e-6);
@@ -442,7 +465,7 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
             case 'newuoa'
                 solvers{i} = @newuoa_test;
             case {'newuoa-500n', 'newuoa_500n'}
-                solvers{i} = @newuoa_test;
+                solvers{i} = @newuoa_500n_test;
             case {'newuoa-200n', 'newuoa_200n'}
                 solvers{i} = @newuoa_200n_test;
             case 'lam'
@@ -475,7 +498,8 @@ function [solver_scores, profile_scores, curves] = profile_optiprofiler(options)
                 solvers{i} = @(fun, x0) bds_acceleration_test(fun, x0, false, true, true);
             case 'bds-no-additional-stopping'
                 solvers{i} = @cbds_simplified_test;
-            case 'bds-simplified'
+            case {'bds-simplified', 'bds-simplified-500n', ...
+                    'bds_simplified_500n'}
                 solvers{i} = @cbds_simplified_test;
             case 'cbds-simplified'
                 solvers{i} = @cbds_simplified_test;
@@ -1035,6 +1059,16 @@ function x = fd_bfgs_500n_test(fun, x0, with_gradient, noise_level)
 
 end
 
+function x = bfgs_no_gradient_500n_test(fun, x0)
+
+    options.MaxFunctionEvaluations = 500*numel(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.with_gradient = false;
+    x = fminunc_wrapper(fun, x0, options);
+
+end
+
 function x = praxis_test(fun, x0)
     %xtol = eps;
     xtol = 1e-6;
@@ -1092,6 +1126,43 @@ function x = cbds_500n_test(fun, x0)
     option.MaxFunctionEvaluations = 500*length(x0);
     option.StepTolerance = 1e-12;
     x = bds(fun, x0, option);
+
+end
+
+function x = bds_production_500n_test(fun, x0)
+
+    x = bds_benchmark_profile_test(fun, x0, true, false, false);
+
+end
+
+function x = bds_benchmark_profile_test( ...
+        fun, x0, use_acceleration, use_function_stop, use_gradient_stop)
+
+    options.Algorithm = 'cbds';
+    options.MaxFunctionEvaluations = 500*numel(x0);
+    options.StepTolerance = 1e-6;
+    options.ftarget = -Inf;
+    options.alpha_init = 1;
+    options.expand = 2.0;
+    options.shrink = 0.5;
+    options.is_noisy = false;
+    options.forcing_function = @(alpha) alpha^2;
+    options.reduction_factor = [0, eps, eps];
+    options.polling_inner = 'opportunistic';
+    options.cycling_inner = 1;
+    options.use_productive_direction_memory = use_acceleration;
+    options.use_iteration_pattern_step = use_acceleration;
+    options.use_momentum_extrapolation = use_acceleration;
+    options.use_function_value_stop = use_function_stop;
+    options.func_window_size = 20;
+    options.func_tol = 1e-6;
+    options.use_estimated_gradient_stop = use_gradient_stop;
+    options.grad_window_size = 1;
+    options.grad_tol = 1e-2;
+    options.lipschitz_constant = 1e3;
+    options.use_gradient_reference_consistency = true;
+    options.grad_reference_finite_difference_error_tol = 1/30;
+    x = bds(fun, x0, options);
 
 end
 
@@ -1696,14 +1767,9 @@ end
 function x = bfo_test(fun, x0)
 
     ensure_bfo_on_path();
-
-    % Dimension
-    n = numel(x0);
-
-    StepTolerance = 1e-6;
-    maxeval = 500*n;
-
-    [x, ~, ~, ~, ~] = bfo(fun, x0, 'epsilon', StepTolerance, 'maxeval', maxeval);
+    options.StepTolerance = 1e-6;
+    options.MaxFunctionEvaluations = 500*numel(x0);
+    x = bfo_wrapper(fun, x0, options);
     
 end
 
@@ -1721,6 +1787,17 @@ function x = newuoa_test(fun, x0)
     options.maxfun = 500*length(x0);
     x = newuoa(fun, x0, options);
     
+end
+
+function x = newuoa_500n_test(fun, x0)
+
+    ensure_newuoa_on_path();
+    options.Algorithm = 'newuoa';
+    options.MaxFunctionEvaluations = 500*numel(x0);
+    options.StepTolerance = 1e-6;
+    options.alpha_init = 1;
+    x = prima_wrapper(fun, x0, options);
+
 end
 
 function x = newuoa_200n_test(fun, x0)
@@ -1756,40 +1833,10 @@ function x = nomad_500n_test(fun, x0)
 end
 
 function x = nomad_with_budget_test(fun, x0, max_eval_factor)
-    
-    % Dimension:
-    n = numel(x0);
 
     ensure_nomad_on_path();
-
-    % Set the default bounds.
-    lb = -inf(n, 1);
-    ub = inf(n, 1);
-
-    % Set MAXFUN to the maximum number of function evaluations.
-    MaxFunctionEvaluations = max_eval_factor*n;
-
-    % We deliberately do not set MIN_FRAME_SIZE or MIN_MESH_SIZE here. In
-    % NOMAD 4, their parameter documentation says "No default value"; during
-    % parameter checking, however, undefined minimum frame/mesh sizes are
-    % internally expanded to 0 for continuous variables, or to granularity
-    % for granular variables. For our continuous unconstrained CUTEst/S2MPJ
-    % tests, leaving them unset is therefore equivalent to using 0, so NOMAD
-    % will not stop early at a positive mesh/frame tolerance such as 1e-6.
-    % This matches the Python PyNomad wrapper, where only MAX_BB_EVAL and
-    % display/output parameters are supplied.
-    params = struct('BB_OUTPUT_TYPE', 'OBJ', ...
-    'MAX_BB_EVAL', num2str(MaxFunctionEvaluations), 'max_eval',num2str(MaxFunctionEvaluations));
-
-    % As of NOMAD version 4.4.0 and OptiProfiler commit 24d8cc0, the following line is 
-    % necessary. Otherwise, NOMAD will throw an error, complaining that the blackbox 
-    % evaluation fails. This seems to be because OptiProfiler wraps the function 
-    % handle in a way that NOMAD does not expect: NOMAD expects a function handle 
-    % `fun` with the signature fun(x), where x is a column vector, while OptiProfiler 
-    % produces one with the signature @(varargin)featured_problem.fun(varargin{:}).
-    fun = @(x) fun(x(:));
-
-    [x, ~, ~, ~, ~] = nomadOpt(fun,x0,lb,ub,params);
+    options.MaxFunctionEvaluations = max_eval_factor*numel(x0);
+    x = nomad_wrapper(fun, x0, options);
     
 end
 

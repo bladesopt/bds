@@ -23,29 +23,38 @@ jobs:
     - name: Check spelling
       id: check_spelling
       run: |
-        find . -type f \( -name "*.tex" -o -name "*.bib" \) ! -path "./research/*" ! -name "custom_dictionary.txt" -exec sh -c 'hunspell -l -t -d en_US {} | grep -v -w -f .github/actions/spell_check/custom_dictionary.txt > {}_spelling_errors.txt' \;
+        while IFS= read -r -d '' source_file; do
+          hunspell -l -t -d en_US "$source_file" |
+            grep -v -w -f .github/actions/spell_check/custom_dictionary.txt \
+              > "${source_file}_spelling_errors.txt" || true
+        done < <(find . -type f \( -name "*.tex" -o -name "*.bib" \) \
+          ! -path "./research/*" ! -name "custom_dictionary.txt" -print0)
+
         errors_found=false
-        for file in $(find . -type f -name "*_spelling_errors.txt"); do
-          if [ -s $file ]; then
+        while IFS= read -r -d '' error_file; do
+          if [ -s "$error_file" ]; then
             errors_found=true
             break
           fi
-        done
+        done < <(find . -type f -name "*_spelling_errors.txt" -print0)
+
         if [ "$errors_found" = true ]; then
           echo "Spelling errors summary:" > spelling_errors_summary.txt
-          for file in $(find . -type f -name "*_spelling_errors.txt"); do
-            if [ -s $file ]; then
-              echo "Spelling errors found in $(basename $file _spelling_errors.txt):" >> spelling_errors_summary.txt
-              cat $file >> spelling_errors_summary.txt
-              echo "" >> spelling_errors_summary.txt
+          while IFS= read -r -d '' error_file; do
+            if [ -s "$error_file" ]; then
+              {
+                echo "Spelling errors found in $(basename "$error_file" _spelling_errors.txt):"
+                cat -- "$error_file"
+                echo
+              } >> spelling_errors_summary.txt
             fi
-          done
+          done < <(find . -type f -name "*_spelling_errors.txt" -print0)
           echo "Please fix the spelling errors listed in 'spelling_errors_summary.txt'."
           cat spelling_errors_summary.txt
           exit 1
         else
           echo "No spelling errors found."
-          rm -f *_spelling_errors.txt
+          find . -type f -name "*_spelling_errors.txt" -delete
         fi
 
     - name: Upload spelling errors summary

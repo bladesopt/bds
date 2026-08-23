@@ -1,0 +1,119 @@
+name: Benchmark BDS acceleration, small, S2MPJ
+
+on:
+  workflow_dispatch:
+
+jobs:
+  profile:
+    name: Acceleration, small, ${{ matrix.feature }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [plain, noisy_1e-1, noisy_1e-2, noisy_1e-3, noisy_1e-4, permuted, linearly_transformed, rotation_noisy_1e-1, rotation_noisy_1e-2, rotation_noisy_1e-3, rotation_noisy_1e-4]
+
+    steps:
+      - name: Check out BDS
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Check out OptiProfiler
+        uses: actions/checkout@v4
+        with:
+          repository: optiprofiler/optiprofiler
+          path: optiprofiler
+          ref: 5a19e88cc34f9b8925e111934a6b12011422fcdb
+
+      - name: Install LaTeX
+        run: sudo apt-get update && sudo apt-get install -y texlive
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2.1.2
+        with:
+          release: latest
+
+      - name: Profile acceleration configurations
+        uses: matlab-actions/run-command@v2.1.1
+        with:
+          command: |
+            root_dir = pwd();
+            cd(fullfile(root_dir, 'optiprofiler'));
+            setup(struct('install_matcutest', false));
+            cd(root_dir);
+            setup;
+            addpath(fullfile(root_dir, 'tests'));
+            options = struct();
+            options.feature_name = '${{ matrix.feature }}';
+            options.solver_names = {'bds-acceleration-off-500n', 'bds-acceleration-on-500n'};
+            options.mindim = 1;
+            options.maxdim = 5;
+            options.plibs = 's2mpj';
+            options.run_plain = false;
+            options.summarize_log_ratio_profiles = false;
+            profile_optiprofiler(options);
+
+      - name: Give the summary PDF a stable name
+        shell: bash
+        run: |
+          cd tests/testdata
+          find . -type f -name 'summary.pdf' | while read -r file; do
+            parent_dir=$(dirname "$file")
+            parent_name=$(basename "$parent_dir")
+            stable_name=$(bash "$GITHUB_WORKSPACE/tests/tools/strip_profile_timestamp.sh" "$parent_name")
+            mv "$file" "$parent_dir/summary_${stable_name}.pdf"
+          done
+
+      - name: Upload feature artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: profile_optiprofiler_bds_acceleration_small_${{ matrix.feature }}_s2mpj
+          path: tests/testdata/
+
+  merge_artifacts:
+    name: Merge acceleration artifacts
+    runs-on: ubuntu-latest
+    needs: profile
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Check out BDS
+        uses: actions/checkout@v4
+
+      - name: Install PDF tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Download feature artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: tests/testdata/downloaded_artifacts
+
+      - name: Merge summary PDFs
+        shell: bash
+        run: |
+          cp tests/tools/merge_pdf.sh tests/testdata/downloaded_artifacts
+          cp tests/tools/get_base_info.sh tests/testdata/downloaded_artifacts
+          cd tests/testdata/downloaded_artifacts
+          source ./get_base_info.sh
+          echo "BASE_INFO=${BASE_INFO}" >> "$GITHUB_ENV"
+          mkdir summary
+          find . -maxdepth 3 -type f -name 'summary*.pdf' -exec cp -n {} summary/ \;
+          cd summary
+          bash ../merge_pdf.sh
+          mv merged.pdf "summary_${BASE_INFO}.pdf"
+          cd ..
+          mv summary "summary_${BASE_INFO}"
+
+      - name: Upload merged profiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged_profiles_${{ env.BASE_INFO }}
+          path: tests/testdata/downloaded_artifacts/**
+
+      - name: Upload merged summaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary_files_${{ env.BASE_INFO }}
+          path: tests/testdata/downloaded_artifacts/summary_${{ env.BASE_INFO }}/**
