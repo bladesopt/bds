@@ -137,7 +137,7 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
 - [x] 6. 提交最终计划并再次确认待发布 commit 和所有 push targets。
 - [x] 7. fast-forward 并发布 `main`，不请求 reviewer。
 - [x] 8. 核对公开 `main` 的 README、workflows 和 commit。
-- [ ] 9. 从公开 `main` 触发 12 个正式 workflows。
+- [x] 9. 从公开 `main` 触发 12 个正式 workflows。
 - [ ] 10. 监控全部正式 runs，修复任何失败并重跑。
 - [ ] 11. 抽查正式 artifacts，回填最终证据并完成本计划。
 
@@ -206,3 +206,35 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
   显示公开 `main` 精确包含计划中的 22 个 workflow 文件。
 - 上述首次公开核对于 2026-08-23 19:32 CST 完成。回填本记录后还会产生一个只改
   计划文档的最终记录 commit；正式 workflows 必须从该最终 `main` commit 触发。
+
+### Gate D（执行中）
+
+- 提交 `f52ede00` 在 `bladesopt/bds` 的公开 `main` 上触发完整正式矩阵。当前有效
+  run 集合中的 9 个已成功 runs 为 acceleration big/small `32637077450` /
+  `32637077428`、BFGS big/small `32637077394` / `32637077427`、BFO big/small
+  `32637077422` / `32637077412`、NEWUOA big/small `32637077400` /
+  `32637077415` 和 invalid-function-evaluation big `32637077409`。
+- 原始 NOMAD runs 暴露 `libMatlabEngine.so` 无法解析。第一次补充 Engine 运行库
+  路径时过早设置 `LD_LIBRARY_PATH`，使 NOMAD 构建加载 MATLAB 自带的旧
+  `libstdc++.so.6`；第二次把运行库设置移到构建之后，`ldd` 又准确暴露
+  `libmex.so`、`libmx.so` 和 `libut.so` 三项缺失。最终修复同时加入 MATLAB 的
+  `bin/glnxa64`、`extern/bin/glnxa64` 和 `sys/os/glnxa64`，并保留构建后 `ldd`
+  guard。第三轮替代 runs 为 NOMAD big `32646433565` 和 small `32646433573`。
+- 第三轮抽查 job `97211294626` 已依次通过 NOMAD 构建、系统 C++ 运行库预加载、
+  MATLAB 完整运行库设置和 `ldd` guard，并进入 MATLAB benchmark；这证明动态库
+  修复已在真实 GitHub runner 上生效。
+- 原始 termination run `32637077421` 的 10 个 feature jobs 成功，但
+  `noisy_1e-3` job `97188347846` 在 GitHub runner 的 6 小时上限被取消。完整日志
+  显示 `DIXMAANI1` 的三组 solver runs 均已完成，随后才停止输出；同一 OptiProfiler
+  commit 的下一题 `DIXMAANJ` 又可在隔离服务器快速加载。结合 OptiProfiler 源码，
+  求解结束后的默认逐题 history plot 导出是唯一仍可能长时间阻塞的操作。短暂的
+  `n_runs = 1` 尝试因此不作为正式结果；最终设置
+  `options.draw_hist_plots = 'none'`，保留默认两次随机运行、全部 problems、features
+  和正式 profiles。最终替代 run 为 termination big `32660505584`。
+- 9 个已成功 runs 中，acceleration big/small 各产生 13 个未过期 artifacts；
+  BFGS、BFO 和 NEWUOA 的 big/small 各产生 28 个；
+  invalid-function-evaluation big 产生 5 个。每个 run 均同时包含 merged profiles
+  与 summary bundle。
+- 已实际下载并校验 acceleration big、BFO small 和 invalid-function-evaluation
+  big 的 summary ZIP，分别含 23、53 和 7 个条目，`unzip -tq` 均无错误；下载后
+  已清理本机临时 ZIP。其余运行和 artifact 抽查待全部 runs 完成后继续回填。

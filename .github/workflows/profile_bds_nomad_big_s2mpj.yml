@@ -119,6 +119,10 @@ jobs:
               options.plibs = '${{ matrix.plibs }}';
               options.run_plain = ${{ matrix.run_plain }};
               options.summarize_log_ratio_profiles = ${{ matrix.summarize_log_ratio_profiles }};
+              % Per-problem history plots are auxiliary and can stall after all
+              % solver runs finish. The merged performance/data profiles below
+              % do not depend on them.
+              options.draw_hist_plots = 'none';
               profile_optiprofiler(options);
               cd(root_dir);
               cd(fullfile(root_dir, 'tests'));
