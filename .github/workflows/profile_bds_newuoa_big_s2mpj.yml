@@ -2,6 +2,8 @@ name: Profile production BDS and NEWUOA, big, s2mpj
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   test:

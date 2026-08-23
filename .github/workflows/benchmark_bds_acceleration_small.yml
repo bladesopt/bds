@@ -2,6 +2,8 @@ name: Benchmark BDS acceleration, small, S2MPJ
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   profile:
