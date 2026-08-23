@@ -2,6 +2,8 @@ name: Benchmark BDS termination, big, S2MPJ
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   profile:
