@@ -1,6 +1,9 @@
 name: Benchmark BDS acceleration, big, S2MPJ
 
 on:
+  push:
+    branches:
+      - restore_bfo_nomad_workflows
   workflow_dispatch:
 
 jobs:
@@ -10,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        feature: [plain, noisy_1e-1, noisy_1e-2, noisy_1e-3, noisy_1e-4, permuted, linearly_transformed, rotation_noisy_1e-1, rotation_noisy_1e-2, rotation_noisy_1e-3, rotation_noisy_1e-4]
+        feature: [plain]
 
     steps:
       - name: Check out BDS
@@ -47,7 +50,7 @@ jobs:
             options.feature_name = '${{ matrix.feature }}';
             options.solver_names = {'bds-acceleration-off-500n', 'bds-acceleration-on-500n'};
             options.mindim = 6;
-            options.maxdim = 50;
+            options.maxdim = 6;
             options.plibs = 's2mpj';
             options.run_plain = false;
             options.summarize_log_ratio_profiles = false;

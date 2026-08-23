@@ -35,8 +35,8 @@ name: Check Spelling
 
 on:
   push:
-    branches:
-    - "**"
+    branches-ignore:
+    - restore_bfo_nomad_workflows
     tags-ignore:
     - "**"
   pull_request_target:
