@@ -75,8 +75,11 @@ jobs:
       - name: Set MATLAB runtime library path
         run: |
           matlab_root=$(dirname "$(dirname "$(readlink -f "$(command -v matlab)")")")
+          test -f "$matlab_root/bin/glnxa64/libmex.so"
+          test -f "$matlab_root/bin/glnxa64/libmx.so"
+          test -f "$matlab_root/bin/glnxa64/libut.so"
           test -f "$matlab_root/extern/bin/glnxa64/libMatlabEngine.so"
-          echo "LD_LIBRARY_PATH=$matlab_root/extern/bin/glnxa64:$matlab_root/sys/os/glnxa64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$matlab_root/bin/glnxa64:$matlab_root/extern/bin/glnxa64:$matlab_root/sys/os/glnxa64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Verify Nomad runtime linking
         run: |
