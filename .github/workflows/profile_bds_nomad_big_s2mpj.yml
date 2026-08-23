@@ -2,6 +2,8 @@ name: Profile production BDS and NOMAD, big, s2mpj
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   test:
@@ -60,6 +62,12 @@ jobs:
           release: ${{ matrix.matlab }}
           products: Optimization_Toolbox
 
+      - name: Set MATLAB runtime library path
+        run: |
+          matlab_root=$(dirname "$(dirname "$(readlink -f "$(command -v matlab)")")")
+          test -f "$matlab_root/extern/bin/glnxa64/libMatlabEngine.so"
+          echo "LD_LIBRARY_PATH=$matlab_root/extern/bin/glnxa64:$matlab_root/sys/os/glnxa64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
       - name: Set up Nomad
         run: |
           cd ./nomad
@@ -68,6 +76,10 @@ jobs:
           cmake --build build/release
           cmake --install build/release
           find /usr/lib /lib -name "libstdc++.so.6"
+          ldd build/release/lib/nomadOpt.mexa64
+          if ldd build/release/lib/nomadOpt.mexa64 | grep -q 'not found'; then
+            exit 1
+          fi
 
       - name: Set LD_PRELOAD
         run: echo "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6" >> "$GITHUB_ENV"
