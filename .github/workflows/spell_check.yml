@@ -2,8 +2,6 @@ name: Check TeX_Bib Spelling
 
 on:
   push:
-    branches-ignore:
-      - restore_bfo_nomad_workflows
     paths:
       - '**.tex'
       - '**.bib'

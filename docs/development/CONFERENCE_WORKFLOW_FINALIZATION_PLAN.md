@@ -152,7 +152,7 @@ README 必须为 baseline、八个 competitor workflow 和四个 capability work
 - [x] 8. 更新 `.git/config` 的多仓库配置并只读验证本地生效配置。
 - [x] 9. 通过 Gate A 的全部本地检查。
 - [x] 10. 通过 Gate B 的服务器 MATLAB 检查。
-- [ ] 11. 创建受控 GitHub validation branch，执行并修复 Gate C smoke。
+- [x] 11. 创建受控 GitHub validation branch，执行并修复 Gate C smoke。
 - [ ] 12. 恢复正式矩阵，重新通过 Gate A/Gate B，创建并合并 PR。
 - [ ] 13. 在 `main` 运行十二个正式 workflow，监控至绿色并抽查 artifacts。
 - [ ] 14. 回填 run URL、完成时间和最终状态，归档阶段性计划。
@@ -170,6 +170,8 @@ README 必须为 baseline、八个 competitor workflow 和四个 capability work
 - README 中 22 个 workflow 各有且仅有一组 badge URL 和 workflow link；不存在
   漏项或悬空文件名。
 - `git diff --check` 通过。
+- Gate C 结束并恢复完整 feature/dimension matrices 后，再次执行以上全部 Gate A
+  检查，结果仍全部通过；正式 workflow 内容与 smoke 前的正式版本逐文件一致。
 
 ### Local Git configuration
 
@@ -196,6 +198,10 @@ README 必须为 baseline、八个 competitor workflow 和四个 capability work
   的 GitHub runner smoke 覆盖；mapping contract 已通过，但不把 stub test 记作
   真实 solver smoke。
 - 隔离目录 `/tmp/bds-conference-workflows.vz0Im6` 已在验证后删除。
+- 恢复正式 matrices 后，使用第二个隔离目录重新完整执行 Gate B；上述 workflow
+  contracts、regression suite、两类 acceleration 等价性、gradient stopping 和真实
+  BFGS smoke 均再次通过。第二个隔离目录
+  `/tmp/bds-final-workflows.x12Bpr` 也已在验证后删除。
 
 ### Canonical public repository
 
@@ -204,4 +210,26 @@ README 必须为 baseline、八个 competitor workflow 和四个 capability work
   基线为 production commit `988b2629`；本轮 PR 必须把 production 基线与新
   workflows 一并带到 `bladesopt/main`，否则 README badges 不会对应当前代码。
 
-后续仍需逐项完成 Gate C、正式 PR/main runs 和 artifacts 抽查；不得预先勾选。
+### Gate C
+
+- 临时 smoke commit `e6c70c41` 只在
+  `restore_bfo_nomad_workflows` push 时触发十二个新 workflow；每个 workflow
+  只运行一个 feature，small 使用维数 1，big 使用维数 6。
+- 七个原本监听所有 push 的 baseline workflow 在 smoke commit 中临时忽略该
+  validation branch，避免运行与正式矩阵 contract 冲突的 regression，也避免无关
+  Actions 消耗；这些临时设置在 smoke 后全部恢复。
+- GitHub API 精确识别到 12 个 run，最终状态为 12 success、0 failure：
+  - acceleration big：run `32634630464`；
+  - acceleration small：run `32634630458`；
+  - termination big：run `32634630451`；
+  - invalid-function-evaluation：run `32634630470`；
+  - BFGS big/small：runs `32634630452`、`32634630477`；
+  - BFO big/small：runs `32634630474`、`32634630504`；
+  - NEWUOA big/small：runs `32634630465`、`32634630494`；
+  - NOMAD big/small：runs `32634630472`、`32634630507`。
+- Artifacts API 确认每个 run 均有一个 feature artifact、一个 merged-profiles
+  artifact 和一个 summary-files artifact，共 36 个未过期 artifacts。
+- smoke 因此实际覆盖了 GitHub Ubuntu runner、MATLAB setup、S2MPJ、四个
+  comparison solvers、LaTeX/PDF、artifact upload/download 和 merge。
+
+后续仍需逐项完成正式 PR、main runs 和正式 artifacts 抽查；不得预先勾选。

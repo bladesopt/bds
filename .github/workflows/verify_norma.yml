@@ -3,8 +3,6 @@ name: Verification, norma
 on:
   # Trigger the workflow on push or pull request
   push:
-    branches-ignore:
-      - restore_bfo_nomad_workflows
   # Trigger the workflow manually
   # schedule:
   #  - cron: '0 22 */7 * *'

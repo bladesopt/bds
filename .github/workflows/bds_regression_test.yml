@@ -2,8 +2,6 @@ name: BDS regression test
 
 on:
   push:
-    branches-ignore:
-      - restore_bfo_nomad_workflows
   pull_request:
   workflow_dispatch:
 

@@ -1,9 +1,6 @@
 name: Benchmark BDS termination, big, S2MPJ
 
 on:
-  push:
-    branches:
-      - restore_bfo_nomad_workflows
   workflow_dispatch:
 
 jobs:
@@ -13,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        feature: [plain]
+        feature: [plain, noisy_1e-1, noisy_1e-2, noisy_1e-3, noisy_1e-4, permuted, linearly_transformed, rotation_noisy_1e-1, rotation_noisy_1e-2, rotation_noisy_1e-3, rotation_noisy_1e-4]
 
     steps:
       - name: Check out BDS
@@ -50,7 +47,7 @@ jobs:
             options.feature_name = '${{ matrix.feature }}';
             options.solver_names = {'bds-function-value-stop-500n', 'bds-estimated-gradient-stop-500n', 'bds-combined-stop-500n'};
             options.mindim = 6;
-            options.maxdim = 6;
+            options.maxdim = 50;
             options.plibs = 's2mpj';
             options.run_plain = false;
             options.summarize_log_ratio_profiles = false;

@@ -1,9 +1,6 @@
 name: Test invalid function evaluation handling, big, S2MPJ
 
 on:
-  push:
-    branches:
-      - restore_bfo_nomad_workflows
   workflow_dispatch:
 
 jobs:
@@ -13,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        feature: [random_nan_5]
+        feature: [random_nan_5, random_nan_10, random_nan_20]
 
     steps:
       - name: Check out BDS
@@ -51,7 +48,7 @@ jobs:
             options.feature_name = '${{ matrix.feature }}';
             options.solver_names = {'bds-invalid-aware-500n', 'bds-simplified-500n'};
             options.mindim = 6;
-            options.maxdim = 6;
+            options.maxdim = 50;
             options.plibs = 's2mpj';
             options.run_plain = false;
             options.summarize_log_ratio_profiles = false;

@@ -1,9 +1,6 @@
 name: Profile production BDS and NOMAD, small, s2mpj
 
 on:
-  push:
-    branches:
-      - restore_bfo_nomad_workflows
   workflow_dispatch:
 
 jobs:
@@ -22,7 +19,7 @@ jobs:
         plibs: [s2mpj]
         run_plain: [false]
         summarize_log_ratio_profiles: [false]
-        feature: [plain]
+        feature: [plain, perturbed_x0_0.001, perturbed_x0_1, perturbed_x0_10, perturbed_x0_100, noisy_1e-1, noisy_1e-2, noisy_1e-3, noisy_1e-4, truncated_1, truncated_2, truncated_3, truncated_4, permuted, linearly_transformed, random_nan_5, random_nan_10, random_nan_20, quantized_1, quantized_2, quantized_3, quantized_4, rotation_noisy_1e-1, rotation_noisy_1e-2, rotation_noisy_1e-3, rotation_noisy_1e-4]
 
     steps:
       - name: Check out repository
@@ -102,7 +99,7 @@ jobs:
               options.feature_name = '${{ matrix.feature }}';
               options.solver_names = {'${{ matrix.solver }}', '${{ matrix.competitor }}'};
               options.mindim = 1;
-              options.maxdim = 1;
+              options.maxdim = 5;
               options.plibs = '${{ matrix.plibs }}';
               options.run_plain = ${{ matrix.run_plain }};
               options.summarize_log_ratio_profiles = ${{ matrix.summarize_log_ratio_profiles }};
