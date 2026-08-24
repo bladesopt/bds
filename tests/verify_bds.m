@@ -1,6 +1,7 @@
 function verify_bds(parameters)
-% This function compares bds with bds_norma, verifying whether they produce consistent results on
-% CUTEst/S2MPJ problems.
+% This function compares production BDS with its pre-acceleration NORMA baseline, verifying whether
+% they produce consistent results on CUTEst/S2MPJ problems when all three acceleration mechanisms
+% in production BDS are disabled.
 %
 % where
 % - `Algorithm` is the name of the algorithm to test, including "cbds", "ds", "rbds", and "pads".
@@ -47,7 +48,7 @@ try
     setup
     cd(path_verify_bds);
 
-    solvers = {"bds", "bds_norma"};
+    solvers = {@run_bds_without_acceleration, "bds_norma"};
 
     % Get list of problems
     if isfield(parameters, "ptype")
@@ -187,5 +188,14 @@ cd(old_dir);
 if ~isempty(exception)  % Rethrow any exception caught above.
     rethrow(exception);
 end
+
+end
+
+function [xopt, fopt, exitflag, output] = run_bds_without_acceleration(fun, x0, options)
+
+options.use_productive_direction_memory = false;
+options.use_iteration_pattern_step = false;
+options.use_momentum_extrapolation = false;
+[xopt, fopt, exitflag, output] = bds(fun, x0, options);
 
 end
