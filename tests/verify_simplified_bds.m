@@ -1,6 +1,6 @@
 function verify_simplified_bds(parameters)
 % This function tests the latest version of the BDS solver against its simplified version,
-% verifying whether they produce consistent results on CUTEst problems.
+% verifying whether they produce consistent results on S2MPJ problems.
 %
 % where
 % - `problem_names` are the names of the problems to test.

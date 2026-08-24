@@ -1,6 +1,6 @@
 function verify_bds(parameters)
 % This function compares production BDS with its pre-acceleration NORMA baseline, verifying whether
-% they produce consistent results on CUTEst/S2MPJ problems when all three acceleration mechanisms
+% they produce consistent results on S2MPJ problems when all three acceleration mechanisms
 % in production BDS are disabled.
 %
 % where
