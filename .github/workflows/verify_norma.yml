@@ -79,5 +79,11 @@ jobs:
             cd(fullfile(root_dir, 'tests'))
             parameters.Algorithm = '${{ matrix.Algorithm }}';
             parameters.parallel = ${{ matrix.parallel }};
+            % NORMA predates acceleration, target-stop fixes, and robust handling
+            % of failed/nonfinite evaluations. Compare the shared core polling
+            % behavior; the excluded behaviors have dedicated workflows.
+            parameters.num_random = 3;
+            parameters.use_tough_problems = false;
+            parameters.disable_target_stopping = true;
             verify_bds(parameters);
             

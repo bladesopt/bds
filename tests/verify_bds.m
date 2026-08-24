@@ -11,6 +11,9 @@ function verify_bds(parameters)
 % - `num_random` is the number of random runs in iseqiv.m. Default is 20.
 % - `parallel` is either true or false, which means whether to test the problems parallelly.
 % - `problem_type` can only be "u" now, indicating the problem type to test.
+% - `use_tough_problems` controls whether randomized noise and failed/nonfinite evaluations are
+%   introduced. It defaults to true.
+% - `disable_target_stopping` forces ftarget to -Inf. It defaults to false.
 %
 % Coded by LI Haitian (hai-tian.li@connect.polyu.hk) and Zaikun ZHANG (zhangzaikun@mail.sysu.edu.cn).
 %

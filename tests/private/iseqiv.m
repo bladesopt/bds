@@ -98,12 +98,19 @@ end
 if 16 <= ir && ir <= 17
     test_options.grad_tol = 1e-3*(1 + 0.5*(2*rand-1));
 end
-if 1 <= ir && ir <= 20
+use_tough_problems = ~isfield(options, 'use_tough_problems') ...
+    || options.use_tough_problems;
+if use_tough_problems && 1 <= ir && ir <= 20
     % The TOUGH tests
     % We must pass the random seed `rseed` to `tough` to ensure reproducibility.
     p = tough(p, rseed);
 else
     p.objective  = objective;
+end
+
+if isfield(options, 'disable_target_stopping') ...
+        && options.disable_target_stopping
+    test_options.ftarget = -inf;
 end
  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BEGIN: Call the solvers %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -207,4 +214,3 @@ function eq = iseq(x, f, exitflag, output, xx, ff, ee, oo, prec)
     end
     
     return
-
