@@ -1,6 +1,8 @@
 name: Benchmark BDS termination, big, S2MPJ
 
 on:
+  schedule:
+    - cron: '0 18 15 * *'
   workflow_dispatch:
 
 jobs:

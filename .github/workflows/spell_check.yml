@@ -2,11 +2,6 @@ name: Check TeX_Bib Spelling
 
 on:
   push:
-    paths:
-      - '**.tex'
-      - '**.bib'
-      - '**.txt'
-      - '**.yml'
   workflow_dispatch:
 
 

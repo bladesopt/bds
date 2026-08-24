@@ -1,11 +1,9 @@
 name: Test the correctness of gradient estimation
 
 on:
-  # Trigger the workflow on push or pull request
+  # Run the core gradient-estimation check on every push.
   push:
-  # Trigger the workflow manually
-  # schedule:
-  #   - cron: '0 18 * * *'
+  # Trigger the workflow manually.
   workflow_dispatch:
 
 jobs:

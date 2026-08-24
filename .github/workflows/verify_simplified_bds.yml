@@ -1,11 +1,10 @@
 name: Verification, simplified BDS
 
 on:
-  # Trigger the workflow on push or pull request
-  push:
+  # Run this non-core verification monthly to avoid competing with push checks.
+  schedule:
+    - cron: '0 18 4 * *'
   # Trigger the workflow manually
-  # schedule:
-  #  - cron: '0 22 */7 * *'
   workflow_dispatch:
 
 jobs:

@@ -6,8 +6,8 @@ on:
   # This expensive stress-style matrix is scheduled or started manually; it is not a PR gate.
   # Trigger the workflow by cron. The default time zone of GitHub Actions is UTC.
   schedule:
-  - cron: '0 18 1 * *'
-  # Trigger the workflow manually
+    - cron: '0 18 2 * *'
+  # Trigger the workflow manually.
   workflow_dispatch:
     inputs:
       git-ref:

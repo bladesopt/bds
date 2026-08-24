@@ -22,7 +22,7 @@ If setup succeeds, BDS is ready to use. Run `help bds` for the complete solver
 interface and option contracts.
 
 MATLAB R2017a and earlier are not supported. If you encounter a problem, please
-[open an issue](https://github.com/bladesopt/bds/issues).
+[open an issue](https://github.com/blockwise-direct-search/bds/issues).
 
 ## Production BDS capabilities
 
@@ -96,9 +96,33 @@ scale is known in advance.
 
 ### Invalid function evaluations
 
-BDS can continue when a trial evaluation returns `NaN` or throws an error. Such
-points are not accepted as improvements, still count toward the evaluation
-budget, and are reported through the solver output for diagnosis.
+BDS evaluates the objective through
+[`eval_fun.m`](src/private/eval_fun.m). Its core invalid-evaluation handling is:
+
+```matlab
+is_valid = true;
+
+try
+    f_real = fun(x);
+catch
+    warning('The function evaluation failed.');
+    f_real = nan;
+    is_valid = false;
+end
+
+f = f_real;
+if isnan(f_real)
+    f = inf;
+    is_valid = false;
+end
+```
+
+Thus, an evaluation that throws an error is recorded as `NaN`, and either an
+error or a returned `NaN` gives the algorithm the value `Inf` and marks the
+point as invalid. This prevents the point from being accepted as an improvement
+while preserving the raw failed value for diagnosis. The evaluation still
+counts toward the function-evaluation budget, and the point is reported through
+the solver output.
 
 ```matlab
 [xopt, fopt, exitflag, output] = bds(fun, x0);
@@ -115,6 +139,11 @@ fields.
 
 ### Correctness and maintenance
 
+Production BDS regression, unit tests, gradient estimation, NORMA verification,
+MATLAB spelling, and TeX/Bib spelling run on every push. The remaining
+correctness workflows run on separate days of the monthly schedule. Scheduled
+workflows can also be started manually when an additional run is needed.
+
 | Workflow | Status |
 | --- | --- |
 | Production BDS regression | [![BDS regression](https://github.com/bladesopt/bds/actions/workflows/bds_regression_test.yml/badge.svg?branch=main)](https://github.com/bladesopt/bds/actions/workflows/bds_regression_test.yml) |
@@ -130,9 +159,11 @@ fields.
 
 ### Solver comparisons on S2MPJ
 
-Each workflow compares production BDS with one solver. Small problems have
-dimensions 1--5 and big problems have dimensions 6--50. Feature-level results
-are uploaded separately and automatically combined into merged artifacts.
+Each workflow compares production BDS with one solver from the
+[S2MPJ problem collection](https://github.com/GrattonToint/S2MPJ). Small
+problems have dimensions 1--5 and big problems have dimensions 6--50.
+Feature-level results are uploaded separately and automatically combined into
+merged artifacts.
 
 | Comparison | Size | Status |
 | --- | --- | --- |
@@ -156,6 +187,7 @@ are uploaded separately and automatically combined into merged artifacts.
 
 The experiment workflows reuse
 `tests/profile_optiprofiler.m` with
-[OptiProfiler](https://github.com/optiprofiler/optiprofiler). They are manually
-triggered because the complete feature matrices are substantially more
-expensive than the correctness workflows.
+[OptiProfiler](https://github.com/optiprofiler/optiprofiler). Their complete
+feature matrices are substantially more expensive than the core correctness
+checks, so the workflows run on separate days of a monthly schedule. They
+remain manually triggerable for additional or replacement runs.

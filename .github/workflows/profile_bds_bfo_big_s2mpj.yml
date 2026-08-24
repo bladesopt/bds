@@ -1,6 +1,8 @@
-name: Profile production BDS and BFO, big, s2mpj
+name: Profile production BDS and BFO, big, S2MPJ
 
 on:
+  schedule:
+    - cron: '0 18 6 * *'
   workflow_dispatch:
 
 jobs:

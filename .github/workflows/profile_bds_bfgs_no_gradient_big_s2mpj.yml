@@ -1,6 +1,8 @@
-name: Profile production BDS and BFGS without supplied gradients, big, s2mpj
+name: Profile production BDS and BFGS without supplied gradients, big, S2MPJ
 
 on:
+  schedule:
+    - cron: '0 18 12 * *'
   workflow_dispatch:
 
 jobs:

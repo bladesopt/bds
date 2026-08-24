@@ -1,6 +1,8 @@
 name: Benchmark BDS acceleration, big, S2MPJ
 
 on:
+  schedule:
+    - cron: '0 18 14 * *'
   workflow_dispatch:
 
 jobs:
