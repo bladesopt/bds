@@ -7,6 +7,13 @@ on:
   schedule:
   - cron: '0 18 2 * *'
   workflow_dispatch:
+    inputs:
+      dimension:
+        description: Dimension (Optional)
+        required: false
+      max-function-evaluations:
+        description: Maximum Function Evaluations (Optional)
+        required: false
 
 jobs:
   test:
@@ -52,4 +59,11 @@ jobs:
             % Run tests
             options.Algorithm = "${{ matrix.solver }}";
             options.tough = ${{ matrix.tough }};
+            if ~isempty('${{ inputs.dimension }}')
+                options.n = str2double('${{ inputs.dimension }}');
+            end
+            if ~isempty('${{ inputs.max-function-evaluations }}')
+                options.MaxFunctionEvaluations = ...
+                    str2double('${{ inputs.max-function-evaluations }}');
+            end
             stress("bds", options);
