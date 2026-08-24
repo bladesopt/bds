@@ -2,7 +2,7 @@
 
 ## 目标
 
-在 2026-08-23 完成会议展示前的最终发布：把已经通过 GitHub runner smoke 的
+在 2026-08-23 至 2026-08-24 完成会议展示前的最终发布：把已经通过 GitHub runner smoke 的
 S2MPJ workflows、README 说明和 badges 发布到 `main`，再从 `main` 运行完整正式
 矩阵并监控结果。整个过程由当前代码负责人完成，不请求 Zaikun Zhang 或其他人
 review；合作者明天只需查看最终公开版本。
@@ -138,8 +138,8 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
 - [x] 7. fast-forward 并发布 `main`，不请求 reviewer。
 - [x] 8. 核对公开 `main` 的 README、workflows 和 commit。
 - [x] 9. 从公开 `main` 触发 12 个正式 workflows。
-- [ ] 10. 监控全部正式 runs，修复任何失败并重跑。
-- [ ] 11. 抽查正式 artifacts，回填最终证据并完成本计划。
+- [x] 10. 监控全部正式 runs，修复任何失败并重跑。
+- [x] 11. 抽查正式 artifacts，回填最终证据并完成本计划。
 
 ## 已有前置证据
 
@@ -207,34 +207,84 @@ Regression suite 必须明确通过 acceleration 全关与 frozen BDS reference 
 - 上述首次公开核对于 2026-08-23 19:32 CST 完成。回填本记录后还会产生一个只改
   计划文档的最终记录 commit；正式 workflows 必须从该最终 `main` commit 触发。
 
-### Gate D（执行中）
+### Gate D
 
-- 提交 `f52ede00` 在 `bladesopt/bds` 的公开 `main` 上触发完整正式矩阵。当前有效
-  run 集合中的 9 个已成功 runs 为 acceleration big/small `32637077450` /
-  `32637077428`、BFGS big/small `32637077394` / `32637077427`、BFO big/small
-  `32637077422` / `32637077412`、NEWUOA big/small `32637077400` /
-  `32637077415` 和 invalid-function-evaluation big `32637077409`。
-- 原始 NOMAD runs 暴露 `libMatlabEngine.so` 无法解析。第一次补充 Engine 运行库
-  路径时过早设置 `LD_LIBRARY_PATH`，使 NOMAD 构建加载 MATLAB 自带的旧
-  `libstdc++.so.6`；第二次把运行库设置移到构建之后，`ldd` 又准确暴露
-  `libmex.so`、`libmx.so` 和 `libut.so` 三项缺失。最终修复同时加入 MATLAB 的
-  `bin/glnxa64`、`extern/bin/glnxa64` 和 `sys/os/glnxa64`，并保留构建后 `ldd`
-  guard。第三轮替代 runs 为 NOMAD big `32646433565` 和 small `32646433573`。
-- 第三轮抽查 job `97211294626` 已依次通过 NOMAD 构建、系统 C++ 运行库预加载、
-  MATLAB 完整运行库设置和 `ldd` guard，并进入 MATLAB benchmark；这证明动态库
-  修复已在真实 GitHub runner 上生效。
-- 原始 termination run `32637077421` 的 10 个 feature jobs 成功，但
-  `noisy_1e-3` job `97188347846` 在 GitHub runner 的 6 小时上限被取消。完整日志
-  显示 `DIXMAANI1` 的三组 solver runs 均已完成，随后才停止输出；同一 OptiProfiler
-  commit 的下一题 `DIXMAANJ` 又可在隔离服务器快速加载。结合 OptiProfiler 源码，
-  求解结束后的默认逐题 history plot 导出是唯一仍可能长时间阻塞的操作。短暂的
-  `n_runs = 1` 尝试因此不作为正式结果；最终设置
-  `options.draw_hist_plots = 'none'`，保留默认两次随机运行、全部 problems、features
-  和正式 profiles。最终替代 run 为 termination big `32660505584`。
-- 9 个已成功 runs 中，acceleration big/small 各产生 13 个未过期 artifacts；
-  BFGS、BFO 和 NEWUOA 的 big/small 各产生 28 个；
-  invalid-function-evaluation big 产生 5 个。每个 run 均同时包含 merged profiles
-  与 summary bundle。
-- 已实际下载并校验 acceleration big、BFO small 和 invalid-function-evaluation
-  big 的 summary ZIP，分别含 23、53 和 7 个条目，`unzip -tq` 均无错误；下载后
-  已清理本机临时 ZIP。其余运行和 artifact 抽查待全部 runs 完成后继续回填。
+12 个正式 competitor/capability runs 已全部成功：
+
+| Experiment | Run ID | Artifacts |
+| --- | ---: | ---: |
+| Acceleration big | `32637077450` | 13 |
+| Acceleration small | `32637077428` | 13 |
+| BFGS without supplied gradients big | `32637077394` | 28 |
+| BFGS without supplied gradients small | `32637077427` | 28 |
+| BFO big | `32637077422` | 28 |
+| BFO small | `32637077412` | 28 |
+| NEWUOA big | `32637077400` | 28 |
+| NEWUOA small | `32637077415` | 28 |
+| Invalid function evaluation big | `32637077409` | 5 |
+| Termination big | `32660505584` | 13 |
+| NOMAD small | `32662227623` | 28 |
+| NOMAD big | `32673673644` | 28 |
+
+- 原始 NOMAD runs 暴露 `libMatlabEngine.so` 无法解析。最终修复在 NOMAD 构建完成
+  后加入 MATLAB 的 `bin/glnxa64`、`extern/bin/glnxa64` 和 `sys/os/glnxa64`，预加载
+  系统 `libstdc++`，并由 `ldd` guard 验证所有依赖。修复后的 small run 完整成功。
+- NOMAD big 在默认两次重复下有 9 个 feature jobs 到达 GitHub 的 6 小时上限；完整
+  日志证明它们一直在继续求解 S2MPJ problems，而不是卡在绘图。因而仅对 NOMAD big
+  设置 `n_runs = 1`，保留维数 6--50、全部 problems、26 个 features、两个 solvers、
+  `500*n` 和 `expand=2.0`。第一次 bounded run 的一个 runner 收到平台 shutdown
+  signal；相同配置的完整重跑 `32673673644` 以 27/27 jobs 成功。
+- 原始 termination run 的 `noisy_1e-3` job 在求解完成后、默认逐题 history plot
+  导出期间达到 6 小时上限。设置 `draw_hist_plots = 'none'` 后，最终 run 保留默认
+  两次随机运行、全部 problems/features 和正式 profile 输出，并以 12/12 jobs 成功。
+- 每个正式 run 都同时包含逐 feature artifacts、merged profiles 和 summary bundle。
+  已实际下载并使用 `unzip -tq` 校验 acceleration big、BFO small、
+  invalid-function-evaluation big、termination big、NOMAD small 和 NOMAD big 的
+  summary ZIP，分别包含 23、53、7、23、53 和 53 个条目。NOMAD 的 merged artifacts
+  分别约 237 MB 和 822 MB，已核对 API 元数据与 SHA-256 digest；全部本机临时下载
+  均已清理。
+
+### 公开 badge 补充审计
+
+- 22 个 README badge 的 SVG 实查中，12 个正式实验和 3 个已持续运行的 baseline
+  显示 `passing`；其余 7 个旧 baseline 显示 `no status`。
+- GitHub API 证明这 7 个 workflow 均为历史遗留的 `disabled_manually`，不是测试失败。
+  已由当前代码负责人重新启用；没有创建 PR 或 reviewer request。
+- `spell_check.yml` 原本只有 path-filtered push，现已增加 `workflow_dispatch`；其 push
+  run `32688374702` 成功。Check Spelling push run `32688374694` 也已成功。
+- Parallel/Recursive 首次恢复运行发现它们复用了仅含 Optimization Toolbox 的 MATLAB
+  缓存，实际缺少 Parallel Computing Toolbox。两个 workflow 现使用独立的
+  `optimization-parallel` cache key。Recursive 还修复了未向 solver options 传入矩阵
+  `Algorithm`、保留已不支持的 `scbds` 和 crash helper 路径错误三个旧问题。最终
+  Parallel run `32688568221` 和 Recursive run `32690013044` 均完整成功；后者使用
+  固定 `seed=42`、`dimension=2`、`depth=1`，一次真实递归已经覆盖目标函数内部再次
+  调用 BDS，最终矩阵覆盖五个受支持算法、两个 OS 和两个 MATLAB 版本。
+- NORMA 首次恢复运行发现测试目标仍把默认开启加速的新 BDS 与 pre-acceleration
+  NORMA 直接比较。最终契约比较三项加速全关、普通有限函数值、关闭 target stop 的
+  production BDS 与 NORMA，并显式对齐 NORMA legacy 默认 `expand=1.8`；termination、
+  invalid-evaluation 和 production 默认 `expand=2.0` 由各自专门 workflow 覆盖。
+  最终 NORMA run `32689595009` 以 16/16 jobs 成功。服务器 MATLAB `checkcode` 已确认
+  修改文件无语法问题。
+- Stress 的定时大矩阵仍保留普通问题 `n=500`、tough 问题 `n=1000` 和 `500*n` 预算；
+  手动入口新增可选 dimension/budget。本次恢复 run `32689883726` 用 `n=20`、预算
+  2000 执行完整 40-job OS/MATLAB/solver/tough 矩阵并全部成功。
+- Unit run `32688374670` 以 12/12 jobs 成功。两个 verification workflows 均确认只
+  使用 S2MPJ、不再安装 MatCUTEst；最终 Simplified BDS run `32689595018` 以 4/4 jobs
+  成功。
+- 完成时直接下载 README 中 22 个唯一 `badge.svg?branch=main`；SVG `<title>` 的状态
+  逐个解析为 `passing`，计数为 22/22，没有 `no status`、`failing`、`cancelled` 或
+  `unknown`。最终公开 badge 审计于 2026-08-24 13:13 CST 完成。
+
+### 最终本地审计
+
+- 发布代码 HEAD `71c49cf5` 之后，`.github/workflows` 仍精确包含 22 个 YAML；全部
+  通过 `actionlint` 和 Ruby/Psych 解析，`git diff --check` 通过。
+- README 的 workflow 文件集合与目录中的 22 个 YAML 精确相等，每个文件名恰好出现
+  两次（badge image 和 workflow link）；12 个 competitor/capability workflow 均为
+  manual-only，不含临时 push trigger。
+- 不存在 MatCUTEst 或 large workflow 文件；两个 baseline verification workflows 也
+  已设置 `install_matcutest=false`。四个 artifact shell helpers 通过 `bash -n` 和
+  ShellCheck，timestamp behavior test 再次通过。
+- `.git/config` 的 fetch URL、12 个 push URLs、`main` branch 和 `origin/main` tracking
+  再次逐项打印核对，均与本计划一致。最终完成记录使用 `[skip ci]`，以免镜像同步时
+  重复启动刚刚完成的 workflows。
