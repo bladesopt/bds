@@ -32,6 +32,9 @@ end
 test_options.ftarget = objective(x0) - 10*abs(randn)*max(1, objective(x0));
 test_options.output_xhist = (rand > 0.5);
 test_options.output_block_hist = (rand > 0.5);
+if isfield(options, 'default_expand')
+    test_options.expand = options.default_expand;
+end
 if single_test
     % DO NOT INVOKE ANY RANDOMIZATION WITHIN THIS IF. Otherwise, a single test cannot reproduce the
     % corresponding test in a multiple one.

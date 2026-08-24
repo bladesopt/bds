@@ -85,5 +85,6 @@ jobs:
             parameters.num_random = 3;
             parameters.use_tough_problems = false;
             parameters.disable_target_stopping = true;
+            parameters.default_expand = 1.8;
             verify_bds(parameters);
             

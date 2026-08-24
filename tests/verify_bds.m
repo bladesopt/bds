@@ -14,6 +14,7 @@ function verify_bds(parameters)
 % - `use_tough_problems` controls whether randomized noise and failed/nonfinite evaluations are
 %   introduced. It defaults to true.
 % - `disable_target_stopping` forces ftarget to -Inf. It defaults to false.
+% - `default_expand` supplies the expansion factor unless a random test explicitly overrides it.
 %
 % Coded by LI Haitian (hai-tian.li@connect.polyu.hk) and Zaikun ZHANG (zhangzaikun@mail.sysu.edu.cn).
 %
