@@ -65,7 +65,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.tool_cache }}/MATLAB
-          key: ${{ matrix.os }}-${{ matrix.matlab }}-yes
+          key: ${{ matrix.os }}-${{ matrix.matlab }}-optimization-parallel
 
       - name: Set up MATLAB with optimization toolbox and parallel computing toolbox
         uses: matlab-actions/setup-matlab@v2.1.2
