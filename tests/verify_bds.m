@@ -4,7 +4,8 @@ function verify_bds(parameters)
 % in production BDS are disabled.
 %
 % where
-% - `Algorithm` is the name of the algorithm to test, including "cbds", "ds", "rbds", and "pads".
+% - `Algorithm` is the name of the algorithm to test, including "cbds", "pbds", "ds", "rbds",
+%   and "pads".
 %   If it is not provided, then the default algorithm of BDS is used.
 % - `problem_names` are the names of the problems to test.
 % - `n_runs` is the index of the first random run in iseqiv.m. Default is 1.

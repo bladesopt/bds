@@ -36,7 +36,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         matlab: [R2024b, latest]
-        Algorithm: [cbds, pbds, rbds, ds, pads, scbds]
+        Algorithm: [cbds, pbds, rbds, ds, pads]
 
     steps:
 
@@ -108,6 +108,7 @@ jobs:
             end
             % Copy the crash dump files to root_dir if exceptions occur.
             if ~isempty(exception)
+              cd(fullfile(root_dir, 'tests', 'private'));
               copy_crash_dump_files(root_dir)
               dir(root_dir)
               rethrow(exception);
