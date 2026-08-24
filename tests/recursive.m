@@ -47,6 +47,7 @@ solver = str2func("bds");
 % Define the objective function, which is based on the Rosenbrock function and recursive calls of
 % the solver.
 solver_options = struct();
+solver_options.Algorithm = Algorithm;
 solver_options.MaxFunctionEvaluations = min(100*n, 5e3);
 solver_options.StepTolerance = 1.0e-3;
 fun = @chrosen;
